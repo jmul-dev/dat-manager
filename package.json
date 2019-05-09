@@ -1,0 +1,26 @@
+{
+    "name": "dat-tests",
+    "version": "1.0.0",
+    "main": "index.js",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/mocha": "^5.2.6",
+        "chai": "^4.2.0",
+        "cross-env": "^5.2.0",
+        "mocha": "^6.1.4",
+        "rimraf": "^2.6.3",
+        "tsc-node": "^0.0.3",
+        "tsc-watch": "^2.1.2"
+    },
+    "dependencies": {
+        "@types/node": "^12.0.0",
+        "dat-node": "^3.5.15",
+        "fs-extra": "^7.0.1",
+        "global": "^4.3.2",
+        "mirror-folder": "^3.0.0",
+        "random-access-memory": "^3.1.1",
+        "toiletdb": "^2.0.0",
+        "ts-node": "^8.1.0",
+        "yargs": "^13.2.2"
+    }
+}
