@@ -38,6 +38,8 @@ function closeDat(dat): Promise<any> {
 
 export default class DatManager_DatNode implements DatManagerInterface {
     private db;
+    private dbPath;
+    private dbStoragePath;
     private datStoragePath;
     private datStorageTempPath;
     datKeys: Array<string> = [];
@@ -46,12 +48,18 @@ export default class DatManager_DatNode implements DatManagerInterface {
     constructor() {
         this.datStoragePath = path.resolve(__dirname, "../data/content");
         this.datStorageTempPath = path.resolve(__dirname, "../data/tmp");
-        this.db = toiletdb(
-            path.resolve(__dirname, "../data/dbs/dat-node.json")
-        );
+        this.dbStoragePath = path.resolve(__dirname, "../data/dbs");
+        this.dbPath = path.resolve(__dirname, "../data/dbs/dat-node.json");
     }
 
     async init() {
+        await fs.ensureDir(this.datStoragePath)
+        await fs.ensureDir(this.datStorageTempPath)
+        await fs.ensureDir(this.dbStoragePath)
+        if (!fs.pathExistsSync(this.dbPath)) {
+            await fs.writeJson(this.dbPath, {})
+        }
+        this.db = toiletdb(this.dbPath);
         await this.db.open();
         const storage = await this.db.read();
         if (!storage || !Object.keys(storage).length) {
@@ -104,7 +112,7 @@ export default class DatManager_DatNode implements DatManagerInterface {
                                 if (err) throw err;
                                 // 4. Mirror complete
                                 console.log(`[${key}] mirror complete`);
-                                const diskDat = await createDat(downloadPath);
+                                const diskDat = await createDat(downloadPath, {key});
                                 const diskDatExists = await fs.pathExists(
                                     path.join(downloadPath, ".dat")
                                 );
@@ -180,6 +188,7 @@ export default class DatManager_DatNode implements DatManagerInterface {
         const dat = this.dats[key];
         if (!dat) throw new Error(`dat not found`);
         return new Promise((resolve, reject) => {
+
             const progress = dat.importFiles({ keepExisting: true }, err => {
                 if (err) return reject(err);
                 console.log(`[${key}] importFiles success!`);
@@ -187,6 +196,14 @@ export default class DatManager_DatNode implements DatManagerInterface {
             });
             progress.on("put", (src, dest) => {
                 console.log(`[${key}] imported file: ${dest.name}`);
+            });
+            progress.once("end", () => {
+                console.log('progress:end')
+                resolve();
+            });
+            progress.once("error", (error) => {
+                console.log('progress:error', error)
+                reject();
             });
         });
     }
