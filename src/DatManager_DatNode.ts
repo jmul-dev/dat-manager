@@ -16,12 +16,12 @@ function createDat(storagePath: string, options?: Object): Promise<any> {
     });
 }
 
-function joinNetwork(dat): Promise<any> {
+async function joinNetwork(dat): Promise<any> {
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork();
-        network.once("listening", () => {
-            resolve(network);
-        });
+        network.on("listening", () => {
+            resolve(network)
+        })
         network.on("error", error => {
             if (error.code !== "EADDRINUSE") {
                 reject(error);
@@ -30,10 +30,34 @@ function joinNetwork(dat): Promise<any> {
     });
 }
 
+async function ensurePeerConnected(network, timeout: number = 5000): Promise<any> {
+    return checkExit(timeout)
+    async function checkExit(timeout: number): Promise<any> {  
+        console.log(`checkExit with timeout: ${timeout}`)      
+        if(timeout <= 0) return Promise.reject(new Error(`Peer connection timeout`))
+        if(network.connected) {
+            console.log(`network.connected = true`)  
+            return Promise.resolve()
+        }
+        if(network.connecting) {
+            await sleep(1000)
+            return checkExit(timeout - 1000)
+        }
+        // not connected or connecting
+        return Promise.reject(new Error(`Unable to establish network connection`))
+    }
+}
+
 function closeDat(dat): Promise<any> {
     return new Promise((resolve, reject) => {
         dat.close(resolve);
     });
+}
+
+async function sleep(ms: number): Promise<any> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms)
+    })
 }
 
 export default class DatManager_DatNode implements DatManagerInterface {
@@ -42,6 +66,7 @@ export default class DatManager_DatNode implements DatManagerInterface {
     private dbStoragePath;
     private datStoragePath;
     private datStorageTempPath;
+    private secretDir;
     datKeys: Array<string> = [];
     private dats: Array<any> = [];
 
@@ -50,6 +75,7 @@ export default class DatManager_DatNode implements DatManagerInterface {
         this.datStorageTempPath = path.resolve(__dirname, "../data/tmp");
         this.dbStoragePath = path.resolve(__dirname, "../data/dbs");
         this.dbPath = path.resolve(__dirname, "../data/dbs/dat-node.json");
+        this.secretDir = path.resolve(this.datStoragePath, "../secrets")
     }
 
     async init() {
@@ -102,44 +128,44 @@ export default class DatManager_DatNode implements DatManagerInterface {
         return new Promise((resolve, reject) => {
             network.once("connection", () => {
                 console.log(`[${key}] connection made`);
-                dat.archive.metadata.update(() => {
-                    console.log(`[${key}] metadata update`);
-                    var progress = mirror(
-                        { fs: dat.archive, name: "/" },
-                        downloadPath,
-                        async err => {
-                            try {
-                                if (err) throw err;
-                                // 4. Mirror complete
-                                console.log(`[${key}] mirror complete`);
-                                const diskDat = await createDat(downloadPath, {key});
-                                const diskDatExists = await fs.pathExists(
-                                    path.join(downloadPath, ".dat")
+            });
+            dat.archive.metadata.update(() => {
+                console.log(`[${key}] metadata update`);
+                var progress = mirror(
+                    { fs: dat.archive, name: "/" },
+                    downloadPath,
+                    async err => {
+                        try {
+                            if (err) throw err;
+                            // 4. Mirror complete
+                            console.log(`[${key}] mirror complete`);
+                            const diskDat = await createDat(downloadPath, {key});
+                            const diskDatExists = await fs.pathExists(
+                                path.join(downloadPath, ".dat")
+                            );
+                            if (!diskDatExists)
+                                throw new Error(
+                                    `.dat folder does not exist`
                                 );
-                                if (!diskDatExists)
-                                    throw new Error(
-                                        `.dat folder does not exist`
-                                    );
-                                console.log(`[${key}] ${downloadPath}`);
-                                // 5. Add dat to storage
-                                await this.db.write(key, {
-                                    key: key,
-                                    path: downloadPath
-                                });
-                                this.dats[key] = diskDat;
-                                // Close in memory dat
-                                console.log(`[${key}] closing ram dat`);
-                                await closeDat(dat);
-                                // Join network with the disk dat
-                                console.log(`[${key}] joining network`);
-                                await joinNetwork(diskDat);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
+                            console.log(`[${key}] ${downloadPath}`);
+                            // 5. Add dat to storage
+                            await this.db.write(key, {
+                                key: key,
+                                path: downloadPath
+                            });
+                            this.dats[key] = diskDat;
+                            // Close in memory dat
+                            console.log(`[${key}] closing ram dat`);
+                            await closeDat(dat);
+                            // Join network with the disk dat
+                            console.log(`[${key}] joining network`);
+                            await joinNetwork(diskDat);
+                            resolve();
+                        } catch (error) {
+                            reject(error);
                         }
-                    );
-                });
+                    }
+                );
             });
         });
     }
@@ -148,28 +174,32 @@ export default class DatManager_DatNode implements DatManagerInterface {
         console.log(`attempting to create dat at path: ${storagePath}`);
         // 1. copy content to temp dir
         const tmpDir = path.join(
-            this.datStorageTempPath,
+            this.datStoragePath,
+            `tmp`,
             Date.now().toString()
         );
         await fs.copy(storagePath, tmpDir);
-        // 2. initialize the dat in tmp location
-        const dat = await createDat(tmpDir);
+        // 2. initialize the dat in tmp location (to generate dat key)
+        let dat = await createDat(tmpDir, {secretDir: this.secretDir});
         const datKey = dat.key.toString("hex");
+        this.dats[datKey] = dat;
+        await this.importFiles(datKey);
         // 3. close the dat before we move to perminent location
-        await new Promise((resolve, reject) => {
-            dat.close(err => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            });
-        });
+        await closeDat(dat);
+        dat = null;
+        console.log(`moving temp dir to perm dir`)
         // 4. move to perm location
         const permDir = path.join(this.datStoragePath, datKey);
         await fs.move(tmpDir, permDir);
         // 5. reinitialize the dat
-        const permDat = await createDat(permDir, { key: datKey });
+        const permDat = await createDat(permDir, { key: datKey, secretDir: this.secretDir });
+        permDat.archive.on("ready", () => {
+            console.log('archive:ready')
+        })
+        permDat.archive.on("error", (err) => {
+            console.log('archive:error', err)
+        })
+        // console.log(permDat.archive.stat('/'))
         this.dats[datKey] = permDat;
         // 6. finally run the import
         await this.importFiles(datKey);
@@ -180,7 +210,8 @@ export default class DatManager_DatNode implements DatManagerInterface {
             path: permDir
         });
         // 8. join network and share
-        await joinNetwork(dat);
+        await joinNetwork(permDat);
+        // console.log(util.inspect(permDat, false, 4, true))
         return datKey;
     }
 
@@ -188,20 +219,15 @@ export default class DatManager_DatNode implements DatManagerInterface {
         const dat = this.dats[key];
         if (!dat) throw new Error(`dat not found`);
         return new Promise((resolve, reject) => {
-
-            const progress = dat.importFiles({ keepExisting: true }, err => {
-                if (err) return reject(err);
-                console.log(`[${key}] importFiles success!`);
-                resolve();
-            });
+            const progress = dat.importFiles();
             progress.on("put", (src, dest) => {
                 console.log(`[${key}] imported file: ${dest.name}`);
             });
-            progress.once("end", () => {
+            progress.on("end", () => {
                 console.log('progress:end')
                 resolve();
             });
-            progress.once("error", (error) => {
+            progress.on("error", (error) => {
                 console.log('progress:error', error)
                 reject();
             });
