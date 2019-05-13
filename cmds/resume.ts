@@ -1,4 +1,4 @@
-import DatManager_DatNode from "../src/DatManager_DatNode";
+import DatManager_DatNode from "../src/DatManager";
 
 exports.command = "resume";
 exports.desc = "Resume all dats that were persisted";
