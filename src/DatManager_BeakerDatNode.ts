@@ -1,8 +1,7 @@
 import DatManagerInterface from "./DatManagerInterface";
-import toiletdb from "toiletdb";
 import path from "path";
 import fs from "fs-extra";
-import { createNode } from "@beaker/dat-node";
+import { createNode } from "@ao/dat-node";
 
 async function sleep(ms: number): Promise<any> {
     return new Promise(resolve => {
@@ -12,8 +11,6 @@ async function sleep(ms: number): Promise<any> {
 
 export default class DatManager_DatNode implements DatManagerInterface {
     private datStoragePath;
-    datKeys: Array<string> = [];
-    private dats: Array<any> = [];
     private dat = null;
 
     constructor() {
@@ -30,9 +27,9 @@ export default class DatManager_DatNode implements DatManagerInterface {
     }
 
     async download(key: string) {
-        if (this.dats[key])
-            throw new Error(`Dat instance already exists, skipping download`);
-        const downloadPath = path.join(this.datStoragePath, key);
+        const archive = await this.dat.getArchive(key);
+        await archive.download("/");
+        return archive;
     }
 
     async create(storagePath: string) {
