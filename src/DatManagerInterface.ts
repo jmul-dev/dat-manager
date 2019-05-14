@@ -24,7 +24,7 @@ type DatStats = {
 };
 
 export default interface DatManagerInterface {
-    datKeys: Array<string>;
+    // datKeys: Array<string>;
     init(): Promise<any>;
     /**
      * Downloads a given dat, resolving on success or rejecting on error or timeout.
