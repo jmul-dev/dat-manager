@@ -18,6 +18,7 @@
         "@beaker/dat-node": "git+ssh://git@git.y-designs.com:ao/dat-node.git",
         "dat-encoding": "^5.0.1",
         "dat-node": "^3.5.15",
+        "debug": "^4.1.1",
         "fs-extra": "^7.0.1",
         "global": "^4.3.2",
         "mirror-folder": "^3.0.0",

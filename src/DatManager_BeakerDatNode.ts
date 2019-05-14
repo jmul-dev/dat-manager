@@ -2,6 +2,8 @@ import DatManagerInterface from "./DatManagerInterface";
 import path from "path";
 import fs from "fs-extra";
 import { createNode } from "@ao/dat-node";
+import Debug from "debug";
+const debug = Debug(`ao:dat-manager`);
 
 async function sleep(ms: number): Promise<any> {
     return new Promise(resolve => {
@@ -9,7 +11,7 @@ async function sleep(ms: number): Promise<any> {
     });
 }
 
-export default class DatManager_DatNode implements DatManagerInterface {
+export default class DatManager_BeakerDatNode implements DatManagerInterface {
     private datStoragePath;
     private dat = null;
 
@@ -20,15 +22,18 @@ export default class DatManager_DatNode implements DatManagerInterface {
     async init() {
         await fs.ensureDir(this.datStoragePath);
         this.dat = createNode({ path: this.datStoragePath, fs });
-        await new Promise(resolve => {
-            setTimeout(resolve, 1000);
-        });
+    }
+
+    async resumeAll() {
         await this.dat.resumeAll();
     }
 
     async download(key: string) {
+        debug(`attempting to download: ${key}`);
         const archive = await this.dat.getArchive(key);
+        debug(`archive retrieved, start download...`);
         await archive.download("/");
+        debug(`archive downloaded: ${key}`);
         return archive;
     }
 
