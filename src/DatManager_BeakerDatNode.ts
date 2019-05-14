@@ -38,23 +38,21 @@ export default class DatManager_BeakerDatNode implements DatManagerInterface {
     }
 
     async create(storagePath: string) {
-        console.log(
-            `attempting to create dat at path with file: ${storagePath}`
-        );
+        debug(`attempting to create dat at path with file: ${storagePath}`);
         const archive = await this.dat.createArchive({});
         if (await fs.pathExists(storagePath)) {
-            console.log(`writing file...`);
+            debug(`writing file...`);
             const filename = storagePath.split("/").pop();
             const storageContents = await fs.readFile(storagePath);
             await archive.writeFile(`/${filename}`, storageContents);
         } else {
-            console.log(`writing sample index.md...`);
+            debug(`writing sample index.md...`);
             await archive.writeFile(
                 "/index.md",
                 "# Sup!\n\n This was created by the @beaker/dat-node example code. See [the readme](https://npm.im/@beaker/dat-node) for more information."
             );
         }
-        console.log(`archive created: ${archive.url}`);
+        debug(`archive created: ${archive.url}`);
         const info = await archive.getInfo();
         return info.key;
     }
