@@ -1,22 +1,18 @@
 import DatManagerInterface from "./DatManagerInterface";
 import path from "path";
 import fs from "fs-extra";
-import { createNode } from "@ao/dat-node";
+// import { createNode } from "@ao/dat-node";
+import { createNode } from "../../dat-node"; // relative path while developing
 import Debug from "debug";
 const debug = Debug(`ao:dat-manager`);
 
-async function sleep(ms: number): Promise<any> {
-    return new Promise(resolve => {
-        setTimeout(resolve, ms);
-    });
-}
-
-export default class DatManager_BeakerDatNode implements DatManagerInterface {
+export default class DatManager_AODatNode implements DatManagerInterface {
     private datStoragePath;
     private dat = null;
 
-    constructor() {
-        this.datStoragePath = path.resolve(__dirname, "../data/beaker-content");
+    constructor({ storagePath }) {
+        this.datStoragePath =
+            storagePath || path.resolve(__dirname, "../data/ao-dat-node");
     }
 
     async init() {
@@ -57,6 +53,7 @@ export default class DatManager_BeakerDatNode implements DatManagerInterface {
         return info.key;
     }
 
+    // @TODO: need to determine how files will be imported (stream, path, etc..)
     async importFiles(key: string) {}
 
     async remove(key: string) {}
@@ -82,4 +79,10 @@ export default class DatManager_BeakerDatNode implements DatManagerInterface {
             }
         };
     }
+}
+
+async function sleep(ms: number): Promise<any> {
+    return new Promise(resolve => {
+        setTimeout(resolve, ms);
+    });
 }

@@ -23,8 +23,13 @@ type DatStats = {
     };
 };
 
+type DatManagerOptions = {
+    storagePath: string;
+};
+
 export default interface DatManagerInterface {
-    // datKeys: Array<string>;
+    // constructor(opts: DatManagerOptions);
+
     init(): Promise<any>;
     /**
      * Downloads a given dat, resolving on success or rejecting on error or timeout.

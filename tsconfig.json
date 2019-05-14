@@ -4,7 +4,7 @@
         "rootDir": "./",
         "mapRoot": "dist",
         "allowJs": true,
-        "checkJs": true,
+        "checkJs": false,
         "sourceMap": true,
         "module": "commonjs",
         "esModuleInterop": true,

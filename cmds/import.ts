@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import DatManager_DatNode from "../src/DatManager_DatNode";
+import DatManager from "../src/DatManager";
 import path from "path";
 
 exports.command = "import <key> [file]";
@@ -20,7 +20,9 @@ exports.handler = async function(argv) {
                 )
             );
         }
-        const manager = new DatManager_DatNode();
+        const manager = new DatManager({
+            storagePath: path.resolve(__dirname, "../data/ao-dat-node")
+        });
         await manager.init();
         await manager.importFiles(argv.key);
     } catch (error) {
