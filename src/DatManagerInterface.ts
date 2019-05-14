@@ -23,14 +23,14 @@ type DatStats = {
     };
 };
 
-type DatManagerOptions = {
+export type DatManagerOptions = {
     storagePath: string;
 };
 
 export default interface DatManagerInterface {
-    // constructor(opts: DatManagerOptions);
-
+    // new (opts: DatManagerOptions);
     init(): Promise<any>;
+    close(): Promise<any>;
     /**
      * Downloads a given dat, resolving on success or rejecting on error or timeout.
      *
@@ -46,7 +46,7 @@ export default interface DatManagerInterface {
      *
      * @param key
      */
-    importFiles(key: string): Promise<any>;
+    importFiles(key: string, srcPath: string): Promise<any>;
     /**
      * Remove an existing dat
      *

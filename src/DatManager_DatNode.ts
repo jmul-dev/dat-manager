@@ -286,7 +286,7 @@ export default class DatManager_DatNode implements DatManagerInterface {
         const dat = this.dats[key];
         if (!dat) throw new Error(`dat not found`);
         return new Promise((resolve, reject) => {
-            const progress = dat.importFiles();
+            const progress = dat.importFile();
             progress.on("put", (src, dest) => {
                 console.log(`[${key}] imported file: ${dest.name}`);
             });

@@ -20,6 +20,10 @@ export default class DatManager_AODatNode implements DatManagerInterface {
         this.dat = createNode({ path: this.datStoragePath, fs });
     }
 
+    async close() {
+        await this.dat.close();
+    }
+
     async resumeAll() {
         await this.dat.resumeAll();
     }
@@ -44,7 +48,7 @@ export default class DatManager_AODatNode implements DatManagerInterface {
         } else {
             debug(`writing sample index.md...`);
             await archive.writeFile(
-                "/index.md",
+                "/test.md",
                 "# Sup!\n\n This was created by the @beaker/dat-node example code. See [the readme](https://npm.im/@beaker/dat-node) for more information."
             );
         }
@@ -53,10 +57,39 @@ export default class DatManager_AODatNode implements DatManagerInterface {
         return info.key;
     }
 
-    // @TODO: need to determine how files will be imported (stream, path, etc..)
-    async importFiles(key: string) {}
+    /**
+     * Import file(s) from disk into the given archive
+     *
+     * @param {string}  key
+     * @param {string}  srcPath
+     */
+    async importFiles(key: string, srcPath: string) {
+        debug(`[${key}] import: ${srcPath}`);
+        if (!(await fs.pathExists)) throw new Error(`invalid import path`);
+        const archive = await this.dat.getArchive(key);
+        await archive.writeFileFromDisk(srcPath);
+        debug(`[${key}] import success`);
+    }
 
-    async remove(key: string) {}
+    /**
+     * Remove a dat completely from disk
+     *
+     * @param {string} key
+     */
+    async remove(key: string) {
+        debug(`[${key}] remove()`);
+        const archive = await this.dat.getArchive(key);
+        if (!archive) throw new Error(`cannot remove dat, does not exist`);
+        const diskPath = archive.getPath();
+        await this.dat.removeArchive(key);
+        debug(`[${key}] deleting: ${diskPath}`);
+        await fs.remove(diskPath);
+        debug(`[${key}] succesfully removed!`);
+    }
+
+    list() {
+        return this.dat.listKeys();
+    }
 
     stats(key: string) {
         return {
