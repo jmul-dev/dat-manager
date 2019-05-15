@@ -28,8 +28,6 @@ export type DatManagerOptions = {
 };
 
 export default interface DatManagerInterface {
-    // new (opts: DatManagerOptions);
-    init(): Promise<any>;
     close(): Promise<any>;
     /**
      * Downloads a given dat, resolving on success or rejecting on error or timeout.

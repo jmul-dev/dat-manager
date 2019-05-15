@@ -1,18 +1,14 @@
-import fs from "fs-extra";
 import DatManager from "../DatManager";
-import os from "os";
-import path from "path";
 
 exports.command = "create [dir]";
 exports.desc = "Create dat at given location";
 exports.builder = {};
-exports.handler = async function(argv) {
+exports.handler = async function({ dir, storagePath }) {
     try {
         const manager = new DatManager({
-            storagePath: path.resolve(__dirname, "../data/ao-dat-node")
+            storagePath
         });
-        await manager.init();
-        const datKey = await manager.create(argv.dir);
+        const datKey = await manager.create(dir);
         console.log(`Dat key: ${datKey}`);
     } catch (error) {
         console.error(error);

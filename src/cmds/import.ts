@@ -5,20 +5,19 @@ import path from "path";
 exports.command = "import <key> <file>";
 exports.desc = "Import file/folder to an existing dat instance";
 exports.builder = {};
-exports.handler = async function(argv) {
+exports.handler = async function({ file, key, storagePath }) {
     try {
-        if (!argv.key) throw new Error(`Invalid dat key`);
+        if (!key) throw new Error(`Invalid dat key`);
         // move files to correct folder
-        const srcPath = path.resolve(argv.file);
+        const srcPath = path.resolve(file);
         const exists = await fs.pathExists(srcPath);
         if (!exists) {
             throw new Error(`Src path missing`);
         }
         const manager = new DatManager({
-            storagePath: path.resolve(__dirname, "../data/ao-dat-node")
+            storagePath
         });
-        await manager.init();
-        await manager.importFiles(argv.key, srcPath);
+        await manager.importFiles(key, srcPath);
     } catch (error) {
         console.error(error);
     }

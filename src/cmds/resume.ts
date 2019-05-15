@@ -13,7 +13,6 @@ exports.handler = async function(argv) {
         const manager = new DatManager({
             storagePath: path.resolve(__dirname, "../data/ao-dat-node")
         });
-        await manager.init();
         await manager.resumeAll();
     } catch (error) {
         console.error(error);
