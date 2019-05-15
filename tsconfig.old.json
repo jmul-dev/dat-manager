@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "mapRoot": "dist",
+        "allowJs": true,
+        "checkJs": false,
+        "sourceMap": true,
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "target": "es6",
+        "moduleResolution": "node",
+        "lib": ["es2015", "es6", "esnext.asynciterable"],
+        "allowSyntheticDefaultImports": true
+    },
+    "include": ["src", "cmds"],
+    "exclude": [
+        "./src/**/*.spec.ts",
+        "dist",
+        ".git",
+        ".vscode",
+        ".vscode/*",
+        "node_modules"
+    ]
+}

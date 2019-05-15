@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import DatManager from "../src/DatManager";
+import DatManager from "../DatManager";
 import path from "path";
 
 exports.command = "import <key> <file>";

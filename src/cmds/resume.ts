@@ -1,11 +1,13 @@
-import fs from "fs-extra";
-import DatManager from "../src/DatManager";
-import os from "os";
+import DatManager from "../DatManager";
 import path from "path";
 
-exports.command = "list";
-exports.desc = "List all dats";
-exports.builder = {};
+exports.command = "resume";
+exports.desc = "Resume all dats that were persisted";
+exports.builder = {
+    dir: {
+        default: "."
+    }
+};
 exports.handler = async function(argv) {
     try {
         const manager = new DatManager({
@@ -13,10 +15,6 @@ exports.handler = async function(argv) {
         });
         await manager.init();
         await manager.resumeAll();
-        const list = manager.list();
-        list.forEach(key => {
-            console.log(`${key}`);
-        });
     } catch (error) {
         console.error(error);
     }

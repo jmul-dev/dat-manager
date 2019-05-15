@@ -8,15 +8,12 @@ const debug = Debug(`ao:dat-manager`);
 
 export default class DatManager_AODatNode implements DatManagerInterface {
     private datStoragePath;
-    private dat = null;
+    private dat;
 
     constructor({ storagePath }) {
         this.datStoragePath =
             storagePath || path.resolve(__dirname, "../data/ao-dat-node");
-    }
-
-    async init() {
-        await fs.ensureDir(this.datStoragePath);
+        fs.ensureDirSync(this.datStoragePath);
         this.dat = createNode({ path: this.datStoragePath, fs });
     }
 
