@@ -2,14 +2,15 @@
     "compilerOptions": {
         "outDir": "./dist",
         "rootDir": "./src",
-        "allowJs": true,
+        "allowJs": false,
         "checkJs": false,
         "sourceMap": true,
         "module": "commonjs",
         "esModuleInterop": true,
         "target": "es6",
         "moduleResolution": "node",
-        "lib": ["es2015", "es6", "esnext.asynciterable"]
+        "lib": ["es2015", "es6", "esnext.asynciterable"],
+        "declaration": true
     },
     "include": ["src"],
     "exclude": [

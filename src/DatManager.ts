@@ -1,8 +1,8 @@
 import DatManagerInterface from "./DatManagerInterface";
 import path from "path";
 import fs from "fs-extra";
-// import { createNode } from "@ao/dat-node";
-import { createNode } from "../../dat-node"; // relative path while developing
+import { createNode } from "@ao/dat-node";
+// import { createNode } from "../../dat-node"; // relative path while developing
 import Debug from "debug";
 import DatArchive from "./DatArchive";
 const debug = Debug(`ao:dat-manager`);

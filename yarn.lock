@@ -2,7 +2,34 @@
 # yarn lockfile v1
 
 
-"@ao/dat-node@git+ssh://git@git.y-designs.com:ao/dat-node.git", "@beaker/dat-node@git+ssh://git@git.y-designs.com:ao/dat-node.git":
+"@ao/dat-node@git+ssh://git@git.y-designs.com:ao/dat-node.git":
+  version "1.0.0"
+  resolved "git+ssh://git@git.y-designs.com:ao/dat-node.git#63dca985c3a12564a12f777766faf1c90cfc3b84"
+  dependencies:
+    beaker-error-constants "^1.4.0"
+    concat-stream "^1.6.2"
+    dat-dns "^3.0.1"
+    dat-encoding "^5.0.1"
+    dat-storage "^1.1.1"
+    dat-swarm-defaults "^1.0.1"
+    discovery-swarm "^5.1.2"
+    dom-event-target "^1.0.0"
+    fs-extra "^8.0.1"
+    get-folder-size "^2.0.0"
+    hypercore-protocol "^6.6.4"
+    hyperdrive "^9.14.0"
+    hyperdrive-network-speed "^2.1.0"
+    lodash.pick "^4.4.0"
+    mkdirp "^0.5.1"
+    parse-dat-url "^3.0.1"
+    pauls-dat-api "^8.0.0"
+    random-access-file "2.1.0"
+    sodium-signatures "^2.1.1"
+    sparse-bitfield "^3.0.3"
+    stream-each "^1.2.3"
+    toiletdb "^1.4.1"
+
+"@beaker/dat-node@git+ssh://git@git.y-designs.com:ao/dat-node.git":
   version "1.0.0"
   resolved "git+ssh://git@git.y-designs.com:ao/dat-node.git#5befd54706e82d8db5dc3b13c61f7d2f3c9feb77"
   dependencies:
@@ -28,7 +55,12 @@
   resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-5.2.6.tgz#b8622d50557dd155e9f2f634b7d68fd38de5e94b"
   integrity sha512-1axi39YdtBI7z957vdqXI4Ac25e7YihYQtJa+Clnxg1zTJEaIRbndt71O3sP4GAMgiAm0pY26/b9BrY4MR/PMw==
 
-"@types/node@*", "@types/node@^12.0.1":
+"@types/node@*":
+  version "12.0.2"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.0.2.tgz#3452a24edf9fea138b48fad4a0a028a683da1e40"
+  integrity sha512-5tabW/i+9mhrfEOUcLDu2xBPsHJ+X5Orqy9FKpale3SjDA17j5AEpYq5vfy3oAeAHGcvANRCO3NV3d2D6q3NiA==
+
+"@types/node@^12.0.1":
   version "12.0.1"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-12.0.1.tgz#3dde31f8da274dfeb90e96abf55038fef46285f0"
   integrity sha512-7sy7DKVJrCTbaAERJZq/CU12bzdmpjRr321/Ne9QmzhB3iZ//L16Cizcni5hHNbANxDbxwMb9EFoWkM8KPkp0A==
@@ -1056,6 +1088,15 @@ fs-extra@^7.0.1:
     jsonfile "^4.0.0"
     universalify "^0.1.0"
 
+fs-extra@^8.0.1:
+  version "8.0.1"
+  resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-8.0.1.tgz#90294081f978b1f182f347a440a209154344285b"
+  integrity sha512-W+XLrggcDzlle47X/XnS7FXrXu9sDo+Ze9zpndeBxdgv88FHLm1HtmkhEwavruS6koanBjp098rUpHs65EmG7A==
+  dependencies:
+    graceful-fs "^4.1.2"
+    jsonfile "^4.0.0"
+    universalify "^0.1.0"
+
 fs.realpath@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/fs.realpath/-/fs.realpath-1.0.0.tgz#1504ad2523158caa40db4a2787cb01411994ea4f"
@@ -1234,21 +1275,7 @@ hypercore-crypto@^1.0.0:
     sodium-universal "^2.0.0"
     uint64be "^2.0.2"
 
-hypercore-protocol@^6.4.1:
-  version "6.10.0"
-  resolved "https://registry.yarnpkg.com/hypercore-protocol/-/hypercore-protocol-6.10.0.tgz#d2896cd7ee9e5575767ed3c78450aa16c9caa367"
-  integrity sha512-szYbpwkoAH+zLlN8oY1KORbFzG9LmpIc4oO0AqOTlPPFZU+dWUQIYUJXLHzHnrHFIc+8McOeFM+Gx6m256dJjw==
-  dependencies:
-    buffer-alloc-unsafe "^1.0.0"
-    buffer-from "^1.0.0"
-    inherits "^2.0.3"
-    protocol-buffers-encodings "^1.1.0"
-    readable-stream "^2.2.6"
-    sodium-universal "^2.0.0"
-    sorted-indexof "^1.0.0"
-    varint "^5.0.0"
-
-hypercore-protocol@^6.6.4:
+hypercore-protocol@^6.4.1, hypercore-protocol@^6.6.4:
   version "6.11.0"
   resolved "https://registry.yarnpkg.com/hypercore-protocol/-/hypercore-protocol-6.11.0.tgz#feffde791aea9986e62859229d7cab331d4884c7"
   integrity sha512-V/0Vru8gavoO++K2QFOAXu7xgBuXcBAjURQ9BQ48DnQ/p4hK4Jy76ulRnppDHpbDthxRziMWLZfmYXncwD63Aw==
@@ -1950,9 +1977,9 @@ mutexify@^1.1.0:
   integrity sha512-oprzxd2zhfrJqEuB98qc1dRMMonClBQ57UPDjnbcrah4orEMTq1jq3+AcdFe5ePzdbJXI7zmdhfftIdMnhYFoQ==
 
 nan@^2.4.0, nan@^2.5.1:
-  version "2.13.2"
-  resolved "https://registry.yarnpkg.com/nan/-/nan-2.13.2.tgz#f51dc7ae66ba7d5d55e1e6d4d8092e802c9aefe7"
-  integrity sha512-TghvYc72wlMGMVMluVo9WRJc0mB8KxxF/gZ4YYFy7V2ZQX9l7rgbPg7vjS9mt6U5HXODVFVI2bOduCzwOMv/lw==
+  version "2.14.0"
+  resolved "https://registry.yarnpkg.com/nan/-/nan-2.14.0.tgz#7818f722027b2459a86f0295d434d1fc2336c52c"
+  integrity sha512-INOFj37C7k3AfaNTtX8RhsTw7qRy7eLET14cROi9+5HAVbbHuIWUHEauBv5qT4Av2tWasiTY1Jw6puUNqRJXQg==
 
 nanoassert@^1.0.0:
   version "1.1.0"
@@ -2269,7 +2296,23 @@ pump@^3.0.0:
     end-of-stream "^1.1.0"
     once "^1.3.1"
 
-random-access-file@^2.0.1, random-access-file@^2.1.0, random-access-file@^2.1.1:
+random-access-file@2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/random-access-file/-/random-access-file-2.1.0.tgz#7b3b6623d47e2f89282e77f0c9c9ae6da3cd9039"
+  integrity sha512-W2hY3DboLETMclybTVzyqCNVKx1MjqUwZPzkpkkMD2t9mbGEtkV2SKWPqAJ/FTrAtnWB7aGwl0NDUS82da0KdQ==
+  dependencies:
+    mkdirp "^0.5.1"
+    random-access-storage "^1.1.1"
+
+random-access-file@^2.0.1, random-access-file@^2.1.0:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/random-access-file/-/random-access-file-2.1.2.tgz#eeb32e50b9831f32060516862381152ae4e05aa6"
+  integrity sha512-dZo7HEcEPbZ/6XLXC4GXypiWvFbXVkdeMrJTi0B94pBJwddt/AvJh8GaQhso6KGYROGYCI/VWdHbmRDtkwT9pQ==
+  dependencies:
+    mkdirp "^0.5.1"
+    random-access-storage "^1.1.1"
+
+random-access-file@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/random-access-file/-/random-access-file-2.1.1.tgz#2b57060c776cdfb6d3c56134f2b09a9c67c77663"
   integrity sha512-l8I6RlabShHmNPRqZ0f4mlHgkhgdrd5Prd4RXM9tOizUOMrTglKHB+s78pZZbIsJgny8E9gw0DRqCy3YVLxxZg==
