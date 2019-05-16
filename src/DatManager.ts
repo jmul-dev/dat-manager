@@ -1,4 +1,4 @@
-import DatManagerInterface from "./DatManagerInterface";
+import DatManagerInterface, { DatDownloadOptions } from "./DatManagerInterface";
 import path from "path";
 import fs from "fs-extra";
 import { createNode } from "@ao/dat-node";
@@ -35,10 +35,16 @@ export default class DatManager implements DatManagerInterface {
         throw new Error(`Dat does not exist`);
     }
 
-    async download(key: string): Promise<DatArchive> {
-        debug(`attempting to download: ${key}`);
-        const archive = await this.dat.downloadArchive(key);
-        return archive;
+    async download(
+        key: string,
+        opts: DatDownloadOptions = {}
+    ): Promise<DatArchive> {
+        debug(`[${key}] attempting download...`);
+        if (opts.resolveOnStart) {
+            return await this.dat.getArchive(key);
+        } else {
+            return await this.dat.downloadArchive(key);
+        }
     }
 
     /**

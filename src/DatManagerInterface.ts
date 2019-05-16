@@ -29,6 +29,10 @@ export type DatManagerOptions = {
     storagePath: string;
 };
 
+export type DatDownloadOptions = {
+    resolveOnStart?: boolean;
+};
+
 export default interface DatManagerInterface {
     close(): Promise<any>;
     exists(key: string): boolean;
@@ -41,7 +45,7 @@ export default interface DatManagerInterface {
      *
      * @param key
      */
-    download(key: string): Promise<DatArchive>;
+    download(key: string, opts?: DatDownloadOptions): Promise<DatArchive>;
     /**
      * Initializes a dat and imports files at the given location
      */
