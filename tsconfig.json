@@ -3,7 +3,7 @@
         "outDir": "./dist",
         "rootDir": "./src",
         "allowJs": true,
-        "checkJs": true,
+        "checkJs": false,
         "sourceMap": true,
         "module": "commonjs",
         "esModuleInterop": true,

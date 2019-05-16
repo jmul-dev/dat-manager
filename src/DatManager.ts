@@ -28,13 +28,30 @@ export default class DatManager implements DatManagerInterface {
     async download(key: string) {
         debug(`attempting to download: ${key}`);
         const archive = await this.dat.getArchive(key);
+        archive.hyperdrive.once("content", () => {
+            archive.hyperdrive.content.on("download", (index, data) => {
+                debug(archive.stats());
+                // debug(archive.hyperdrive.content.stats);
+                // const downloadedBytes =
+                //     archive.hyperdrive.content.stats.totals.downloadedBytes ||
+                //     0;
+                // const totalBytes = archive.hyperdrive.content.byteLength || 1;
+                // let percentage = downloadedBytes / totalBytes;
+                // debug(
+                //     `${(percentage * 100).toFixed(0)}% | ${
+                //         archive.hyperdrive.content.stats.peers.length
+                //     } peers | ${downloadedBytes}/${totalBytes} bytes`
+                // );
+            });
+        });
         debug(`archive retrieved, start download...`);
+        sleep(1000);
         await archive.download("/");
         debug(`archive downloaded: ${key}`);
         return archive;
     }
 
-    async create(storagePath: string) {
+    async create(storagePath: string): Promise<string> {
         debug(`attempting to create dat at path with file: ${storagePath}`);
         const archive = await this.dat.createArchive({});
         if (await fs.pathExists(storagePath)) {
