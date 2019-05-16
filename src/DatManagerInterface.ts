@@ -1,3 +1,5 @@
+import DatArchive from "./DatArchive";
+
 // type DatDownloadManager = {
 //     on(event: "complete", callback: Function): void;
 //     on(event: "failed", callback: (error: Error) => void): void;
@@ -29,16 +31,17 @@ export type DatManagerOptions = {
 
 export default interface DatManagerInterface {
     close(): Promise<any>;
+    exists(key: string): boolean;
     /**
      * Downloads a given dat, resolving on success or rejecting on error or timeout.
      *
      * @param key
      */
-    download(key: string): Promise<any>;
+    download(key: string): Promise<DatArchive>;
     /**
      * Initializes a dat and imports files at the given location
      */
-    create(storagePath: string): Promise<string>;
+    create(storagePath: string): Promise<DatArchive>;
     /**
      * Import files for an existing dat instance.
      *

@@ -4,6 +4,7 @@ import fs from "fs-extra";
 // import { createNode } from "@ao/dat-node";
 import { createNode } from "../../dat-node"; // relative path while developing
 import Debug from "debug";
+import DatArchive from "./DatArchive";
 const debug = Debug(`ao:dat-manager`);
 
 export default class DatManager implements DatManagerInterface {
@@ -25,33 +26,22 @@ export default class DatManager implements DatManagerInterface {
         await this.dat.resumeAll();
     }
 
-    async download(key: string) {
+    exists(key: string): boolean {
+        return this.dat.exists(key);
+    }
+
+    async download(key: string): Promise<DatArchive> {
         debug(`attempting to download: ${key}`);
-        const archive = await this.dat.getArchive(key);
-        archive.hyperdrive.once("content", () => {
-            archive.hyperdrive.content.on("download", (index, data) => {
-                debug(archive.stats());
-                // debug(archive.hyperdrive.content.stats);
-                // const downloadedBytes =
-                //     archive.hyperdrive.content.stats.totals.downloadedBytes ||
-                //     0;
-                // const totalBytes = archive.hyperdrive.content.byteLength || 1;
-                // let percentage = downloadedBytes / totalBytes;
-                // debug(
-                //     `${(percentage * 100).toFixed(0)}% | ${
-                //         archive.hyperdrive.content.stats.peers.length
-                //     } peers | ${downloadedBytes}/${totalBytes} bytes`
-                // );
-            });
-        });
-        debug(`archive retrieved, start download...`);
-        sleep(1000);
-        await archive.download("/");
-        debug(`archive downloaded: ${key}`);
+        const archive = await this.dat.downloadArchive(key);
         return archive;
     }
 
-    async create(storagePath: string): Promise<string> {
+    /**
+     * Returns the newly created archive
+     *
+     * @param storagePath
+     */
+    async create(storagePath: string): Promise<DatArchive> {
         debug(`attempting to create dat at path with file: ${storagePath}`);
         const archive = await this.dat.createArchive({});
         if (await fs.pathExists(storagePath)) {
@@ -66,9 +56,7 @@ export default class DatManager implements DatManagerInterface {
                 "# Sup!\n\n This was created by the @beaker/dat-node example code. See [the readme](https://npm.im/@beaker/dat-node) for more information."
             );
         }
-        debug(`archive created: ${archive.url}`);
-        const info = await archive.getInfo();
-        return info.key;
+        return archive;
     }
 
     /**
@@ -92,8 +80,9 @@ export default class DatManager implements DatManagerInterface {
      */
     async remove(key: string) {
         debug(`[${key}] remove()`);
+        if (!this.dat.exists())
+            throw new Error(`cannot remove dat, does not exist`);
         const archive = await this.dat.getArchive(key);
-        if (!archive) throw new Error(`cannot remove dat, does not exist`);
         const diskPath = archive.getPath();
         await this.dat.removeArchive(key);
         debug(`[${key}] deleting: ${diskPath}`);
