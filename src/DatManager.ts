@@ -72,7 +72,10 @@ export default class DatManager implements DatManagerInterface {
      */
     async importFiles(key: string, srcPath: string) {
         debug(`[${key}] import: ${srcPath}`);
-        if (!(await fs.pathExists)) throw new Error(`invalid import path`);
+        if (!(await fs.pathExists(srcPath)))
+            throw new Error(`invalid import path`);
+        if (!this.dat.exists(key))
+            throw new Error(`cannot import files, dat does not exist`);
         const archive = await this.dat.getArchive(key);
         await archive.writeFileFromDisk(srcPath);
         debug(`[${key}] import success`);
