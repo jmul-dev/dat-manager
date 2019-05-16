@@ -41,7 +41,12 @@ export default class DatManager implements DatManagerInterface {
     ): Promise<DatArchive> {
         debug(`[${key}] attempting download...`);
         if (opts.resolveOnStart) {
-            return await this.dat.getArchive(key);
+            try {
+                return await this.dat.getArchive(key);
+            } catch (error) {
+                await this.dat.removeArchive(key);
+                throw error;
+            }
         } else {
             return await this.dat.downloadArchive(key);
         }
