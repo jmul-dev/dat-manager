@@ -30,6 +30,11 @@ export default class DatManager implements DatManagerInterface {
         return this.dat.exists(key);
     }
 
+    async get(key: string): Promise<DatArchive> {
+        if (this.dat.exists(key)) return this.dat.getArchive(key);
+        throw new Error(`Dat does not exist`);
+    }
+
     async download(key: string): Promise<DatArchive> {
         debug(`attempting to download: ${key}`);
         const archive = await this.dat.downloadArchive(key);
@@ -80,13 +85,9 @@ export default class DatManager implements DatManagerInterface {
      */
     async remove(key: string) {
         debug(`[${key}] remove()`);
-        if (!this.dat.exists())
+        if (!this.dat.exists(key))
             throw new Error(`cannot remove dat, does not exist`);
-        const archive = await this.dat.getArchive(key);
-        const diskPath = archive.getPath();
         await this.dat.removeArchive(key);
-        debug(`[${key}] deleting: ${diskPath}`);
-        await fs.remove(diskPath);
         debug(`[${key}] succesfully removed!`);
     }
 

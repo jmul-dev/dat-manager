@@ -33,6 +33,10 @@ export default interface DatManagerInterface {
     close(): Promise<any>;
     exists(key: string): boolean;
     /**
+     * Get an existing dat archive instance
+     */
+    get(key: string): Promise<DatArchive>;
+    /**
      * Downloads a given dat, resolving on success or rejecting on error or timeout.
      *
      * @param key

@@ -19,4 +19,5 @@ export default interface DatArchive {
         length: number;
         version: number;
     };
+    getPath(): string;
 }
