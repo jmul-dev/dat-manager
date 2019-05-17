@@ -20,16 +20,15 @@ export type DatStats = {
     version: number;
     files: number;
     blocksDownlaoded: number;
-    downloaded: number;
     blocksLength: number;
-    length: number;
     byteLength: number;
-    connected: boolean;
     progress: number;
     network: {
         connected: boolean;
         downloadSpeed: number;
         uploadSpeed: number;
+        downloadTotal: number;
+        uploadTotal: number;
     };
     peers: {
         total: number;

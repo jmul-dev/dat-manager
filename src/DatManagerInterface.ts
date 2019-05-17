@@ -8,6 +8,13 @@ import DatArchive from "./DatArchive";
 
 export type DatManagerOptions = {
     storagePath: string;
+    datStorageOptions?: DatStorageOptions;
+};
+
+export type DatStorageOptions = {
+    secretDir?: string;
+    latest?: boolean;
+    prefix?: string;
 };
 
 export type DatDownloadOptions = {
