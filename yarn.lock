@@ -4,7 +4,7 @@
 
 "@ao/dat-node@git+ssh://git@git.y-designs.com:ao/dat-node.git":
   version "1.0.0"
-  resolved "git+ssh://git@git.y-designs.com:ao/dat-node.git#63dca985c3a12564a12f777766faf1c90cfc3b84"
+  resolved "git+ssh://git@git.y-designs.com:ao/dat-node.git#ffa1ebe18b2c035345f90e4f07f0bf9c507b3c86"
   dependencies:
     beaker-error-constants "^1.4.0"
     concat-stream "^1.6.2"
@@ -12,17 +12,19 @@
     dat-encoding "^5.0.1"
     dat-storage "^1.1.1"
     dat-swarm-defaults "^1.0.1"
+    debug "^4.1.1"
     discovery-swarm "^5.1.2"
     dom-event-target "^1.0.0"
     fs-extra "^8.0.1"
     get-folder-size "^2.0.0"
-    hypercore-protocol "^6.6.4"
+    hypercore-protocol "^6.11.0"
     hyperdrive "^9.14.0"
     hyperdrive-network-speed "^2.1.0"
     lodash.pick "^4.4.0"
     mkdirp "^0.5.1"
+    nedb "^1.8.0"
     parse-dat-url "^3.0.1"
-    pauls-dat-api "^8.0.0"
+    pauls-dat-api "^8.1.0"
     random-access-file "2.1.0"
     sodium-signatures "^2.1.1"
     sparse-bitfield "^3.0.3"
@@ -139,6 +141,11 @@ assertion-error@^1.1.0:
   resolved "https://registry.yarnpkg.com/assertion-error/-/assertion-error-1.1.0.tgz#e60b6b0e8f301bd97e5375215bda406c85118c0b"
   integrity sha512-jgsaNduz+ndvGyFt3uSuWqvy4lCnIJiovtouQN5JZHOKCS2QuhEdbcQHFhVksz2N2U9hXJo8odG7ETyWlEeuDw==
 
+async@0.2.10:
+  version "0.2.10"
+  resolved "https://registry.yarnpkg.com/async/-/async-0.2.10.tgz#b6bbe0b0674b9d719708ca38de8c237cb526c3d1"
+  integrity sha1-trvgsGdLnXGXCMo43owjfLUmw9E=
+
 atomic-batcher@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/atomic-batcher/-/atomic-batcher-1.0.2.tgz#d16901d10ccec59516c197b9ccd8930689b813b4"
@@ -167,6 +174,13 @@ bencode@^2.0.0:
   integrity sha512-2uhEl8FdjSBUyb69qDTgOEeeqDTa+n3yMQzLW0cOzNf1Ow5bwcg3idf+qsWisIKRH8Bk8oC7UXL8irRcPA8ZEQ==
   dependencies:
     safe-buffer "^5.1.1"
+
+binary-search-tree@0.2.5:
+  version "0.2.5"
+  resolved "https://registry.yarnpkg.com/binary-search-tree/-/binary-search-tree-0.2.5.tgz#7dbb3b210fdca082450dad2334c304af39bdc784"
+  integrity sha1-fbs7IQ/coIJFDa0jNMMErzm9x4Q=
+  dependencies:
+    underscore "~1.4.4"
 
 bitfield-rle@^2.2.1:
   version "2.2.1"
@@ -929,7 +943,7 @@ hypercore-crypto@^1.0.0:
     sodium-universal "^2.0.0"
     uint64be "^2.0.2"
 
-hypercore-protocol@^6.4.1, hypercore-protocol@^6.6.4:
+hypercore-protocol@^6.11.0, hypercore-protocol@^6.4.1:
   version "6.11.0"
   resolved "https://registry.yarnpkg.com/hypercore-protocol/-/hypercore-protocol-6.11.0.tgz#feffde791aea9986e62859229d7cab331d4884c7"
   integrity sha512-V/0Vru8gavoO++K2QFOAXu7xgBuXcBAjURQ9BQ48DnQ/p4hK4Jy76ulRnppDHpbDthxRziMWLZfmYXncwD63Aw==
@@ -1005,6 +1019,11 @@ hyperdrive@^9.1.1, hyperdrive@^9.14.0:
     thunky "^1.0.2"
     uint64be "^2.0.1"
     unixify "^1.0.0"
+
+immediate@~3.0.5:
+  version "3.0.6"
+  resolved "https://registry.yarnpkg.com/immediate/-/immediate-3.0.6.tgz#9db1dbd0faf8de6fbe0f5dd5e56bb606280de69b"
+  integrity sha1-nbHb0Pr43m++D13V5Wu2BigN5ps=
 
 inflight@^1.0.4:
   version "1.0.6"
@@ -1251,6 +1270,20 @@ length-prefixed-message@^3.0.3:
   dependencies:
     varint "^3.0.1"
 
+lie@3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/lie/-/lie-3.1.1.tgz#9a436b2cc7746ca59de7a41fa469b3efb76bd87e"
+  integrity sha1-mkNrLMd0bKWd56QfpGmz77dr2H4=
+  dependencies:
+    immediate "~3.0.5"
+
+localforage@^1.3.0:
+  version "1.7.3"
+  resolved "https://registry.yarnpkg.com/localforage/-/localforage-1.7.3.tgz#0082b3ca9734679e1bd534995bdd3b24cf10f204"
+  integrity sha512-1TulyYfc4udS7ECSBT2vwJksWbkwwTX8BzeUIiq8Y07Riy7bDAAnxDaPU/tWyOVmQAcWJIEIFP9lPfBGqVoPgQ==
+  dependencies:
+    lie "3.1.1"
+
 locate-path@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/locate-path/-/locate-path-3.0.0.tgz#dbec3b3ab759758071b58fe59fc41871af21400e"
@@ -1391,7 +1424,7 @@ mirror-folder@^3.0.0:
     fd-read-stream "^1.1.0"
     recursive-watch "^1.1.1"
 
-mkdirp@0.5.1, mkdirp@^0.5.1:
+mkdirp@0.5.1, mkdirp@^0.5.1, mkdirp@~0.5.1:
   version "0.5.1"
   resolved "https://registry.yarnpkg.com/mkdirp/-/mkdirp-0.5.1.tgz#30057438eac6cf7f8c4767f38648d6697d75c903"
   integrity sha1-MAV0OOrGz3+MR2fzhkjWaX11yQM=
@@ -1481,6 +1514,17 @@ napi-macros@^1.8.2:
   version "1.8.2"
   resolved "https://registry.yarnpkg.com/napi-macros/-/napi-macros-1.8.2.tgz#299265c1d8aa401351ad0675107d751228c03eda"
   integrity sha512-Tr0DNY4RzTaBG2W2m3l7ZtFuJChTH6VZhXVhkGGjF/4cZTt+i8GcM9ozD+30Lmr4mDoZ5Xx34t2o4GJqYWDGcg==
+
+nedb@^1.8.0:
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/nedb/-/nedb-1.8.0.tgz#0e3502cd82c004d5355a43c9e55577bd7bd91d88"
+  integrity sha1-DjUCzYLABNU1WkPJ5VV3vXvZHYg=
+  dependencies:
+    async "0.2.10"
+    binary-search-tree "0.2.5"
+    localforage "^1.3.0"
+    mkdirp "~0.5.1"
+    underscore "~1.4.4"
 
 network-address@^1.1.2:
   version "1.1.2"
@@ -1650,7 +1694,7 @@ pathval@^1.1.0:
   resolved "https://registry.yarnpkg.com/pathval/-/pathval-1.1.0.tgz#b942e6d4bde653005ef6b71361def8727d0645e0"
   integrity sha1-uULm1L3mUwBe9rcTYd74cn0GReA=
 
-pauls-dat-api@^8.0.0:
+pauls-dat-api@^8.1.0:
   version "8.1.0"
   resolved "https://registry.yarnpkg.com/pauls-dat-api/-/pauls-dat-api-8.1.0.tgz#e0b71728ad7ed416a45f2a417d5156df037d08a1"
   integrity sha512-DTxj5BIPjKJ5dDgQJxMsUfTVUVVi6RSgR3AWz4dl6pwAmQoh4YMYz+cfwfoQRIituMUdczRJkbs/JXD9yaa8dQ==
@@ -2200,6 +2244,11 @@ uint64be@^2.0.1, uint64be@^2.0.2:
   integrity sha512-9QqdvpGQTXgxthP+lY4e/gIBy+RuqcBaC6JVwT5I3bDLgT/btL6twZMR0pI3/Fgah9G/pdwzIprE5gL6v9UvyQ==
   dependencies:
     buffer-alloc "^1.1.0"
+
+underscore@~1.4.4:
+  version "1.4.4"
+  resolved "https://registry.yarnpkg.com/underscore/-/underscore-1.4.4.tgz#61a6a32010622afa07963bf325203cf12239d604"
+  integrity sha1-YaajIBBiKvoHljvzJSA88SI51gQ=
 
 unique-string@^1.0.0:
   version "1.0.0"

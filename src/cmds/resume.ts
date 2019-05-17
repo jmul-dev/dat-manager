@@ -8,10 +8,10 @@ exports.builder = {
         default: "."
     }
 };
-exports.handler = async function(argv) {
+exports.handler = async function({ storagePath }) {
     try {
         const manager = new DatManager({
-            storagePath: path.resolve(__dirname, "../data/ao-dat-node")
+            storagePath
         });
         await manager.resumeAll();
     } catch (error) {

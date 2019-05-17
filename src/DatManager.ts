@@ -2,7 +2,6 @@ import DatManagerInterface, {
     DatDownloadOptions,
     DatManagerOptions
 } from "./DatManagerInterface";
-import path from "path";
 import fs from "fs-extra";
 import { createNode } from "@ao/dat-node";
 // import { createNode } from "../../dat-node"; // relative path while developing
@@ -17,8 +16,7 @@ export default class DatManager implements DatManagerInterface {
 
     constructor(opts: DatManagerOptions) {
         const { storagePath, datStorageOptions } = opts;
-        this.datStoragePath =
-            storagePath || path.resolve(__dirname, "../data/ao-dat-node");
+        this.datStoragePath = storagePath;
         fs.ensureDirSync(this.datStoragePath);
         this.dat = createNode({ path: this.datStoragePath, datStorageOptions });
     }
