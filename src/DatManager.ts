@@ -110,28 +110,6 @@ export default class DatManager implements DatManagerInterface {
     list() {
         return this.dat.listKeys();
     }
-
-    stats(key: string) {
-        return {
-            key: "",
-            writer: false,
-            version: 0,
-            files: 0,
-            blocksDownlaoded: 0,
-            blocksLength: 0,
-            synced: false,
-            byteLength: 0,
-            network: {
-                connected: false,
-                downloadSpeed: 0,
-                uploadSpeed: 0
-            },
-            peers: {
-                total: 0,
-                complete: 0
-            }
-        };
-    }
 }
 
 async function sleep(ms: number): Promise<any> {

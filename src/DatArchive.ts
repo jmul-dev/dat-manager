@@ -10,14 +10,29 @@ export default interface DatArchive {
         opts?: Object
     ): Promise<any>;
     download(filepath: string, opts?: Object): Promise<any>;
-    stats(): {
-        peers: number;
-        connected: boolean;
-        progress: number;
-        files: number;
-        byteLength: number;
-        length: number;
-        version: number;
-    };
+    stats(): DatStats;
     getPath(): string;
 }
+
+export type DatStats = {
+    key: string;
+    writer: boolean;
+    version: number;
+    files: number;
+    blocksDownlaoded: number;
+    downloaded: number;
+    blocksLength: number;
+    length: number;
+    byteLength: number;
+    connected: boolean;
+    progress: number;
+    network: {
+        connected: boolean;
+        downloadSpeed: number;
+        uploadSpeed: number;
+    };
+    peers: {
+        total: number;
+        complete: number;
+    };
+};

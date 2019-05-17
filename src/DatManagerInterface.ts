@@ -5,28 +5,6 @@ import DatArchive from "./DatArchive";
 //     on(event: "failed", callback: (error: Error) => void): void;
 //     progress: number;
 // }
-export type DatStats = {
-    key: string;
-    writer: boolean;
-    version: number;
-    files: number;
-    blocksDownlaoded: number;
-    downloaded: number;
-    blocksLength: number;
-    length: number;
-    byteLength: number;
-    connected: boolean;
-    progress: number;
-    network: {
-        connected: boolean;
-        downloadSpeed: number;
-        uploadSpeed: number;
-    };
-    peers: {
-        total: number;
-        complete: number;
-    };
-};
 
 export type DatManagerOptions = {
     storagePath: string;
@@ -65,10 +43,4 @@ export default interface DatManagerInterface {
      * @param key
      */
     remove(key: string): Promise<any>;
-    /**
-     * Full stats for a given dat
-     *
-     * @param key
-     */
-    stats(key: string): DatStats;
 }
