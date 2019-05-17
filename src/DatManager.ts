@@ -5,6 +5,7 @@ import { createNode } from "@ao/dat-node";
 // import { createNode } from "../../dat-node"; // relative path while developing
 import Debug from "debug";
 import DatArchive from "./DatArchive";
+import { lstatSync } from "fs";
 const debug = Debug(`ao:dat-manager`);
 
 export default class DatManager implements DatManagerInterface {
@@ -55,22 +56,23 @@ export default class DatManager implements DatManagerInterface {
     /**
      * Returns the newly created archive
      *
-     * @param storagePath
+     * @param srcPath
      */
-    async create(storagePath: string): Promise<DatArchive> {
-        debug(`attempting to create dat at path with file: ${storagePath}`);
+    async create(srcPath: string): Promise<DatArchive> {
+        debug(`attempting to create dat, initial data: ${srcPath}`);
         const archive = await this.dat.createArchive({});
-        if (await fs.pathExists(storagePath)) {
-            debug(`writing file...`);
-            const filename = storagePath.split("/").pop();
-            const storageContents = await fs.readFile(storagePath);
-            await archive.writeFile(`/${filename}`, storageContents);
-        } else {
-            debug(`writing sample index.md...`);
-            await archive.writeFile(
-                "/test.md",
-                "# Sup!\n\n This was created by the @beaker/dat-node example code. See [the readme](https://npm.im/@beaker/dat-node) for more information."
-            );
+        debug(`[${archive.key}] created`);
+        if (await fs.pathExists(srcPath)) {
+            if (lstatSync(srcPath).isDirectory()) {
+                debug(`[${archive.key}] importing directory...`);
+            } else {
+                debug(`[${archive.key}] importing file...`);
+                // const filename = srcPath.split("/").pop();
+                // const storageContents = await fs.readFile(srcPath);
+                // await archive.writeFile(`/${filename}`, storageContents);
+            }
+            await archive.writeFileFromDisk(srcPath);
+            debug(`[${archive.key}] import succesful!`);
         }
         return archive;
     }
