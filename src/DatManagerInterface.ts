@@ -5,15 +5,18 @@ import DatArchive from "./DatArchive";
 //     on(event: "failed", callback: (error: Error) => void): void;
 //     progress: number;
 // }
-type DatStats = {
+export type DatStats = {
     key: string;
     writer: boolean;
     version: number;
     files: number;
     blocksDownlaoded: number;
+    downloaded: number;
     blocksLength: number;
-    synced: boolean;
+    length: number;
     byteLength: number;
+    connected: boolean;
+    progress: number;
     network: {
         connected: boolean;
         downloadSpeed: number;
