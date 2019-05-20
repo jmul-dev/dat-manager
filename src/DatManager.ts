@@ -3,8 +3,9 @@ import DatManagerInterface, {
     DatManagerOptions
 } from "./DatManagerInterface";
 import fs from "fs-extra";
-import { createNode } from "@ao/dat-node";
-// import { createNode } from "../../dat-node"; // relative path while developing
+import path from "path";
+// import { createNode } from "@ao/dat-node";
+import { createNode } from "../../dat-node"; // relative path while developing
 import Debug from "debug";
 import DatArchive from "./DatArchive";
 import { lstatSync } from "fs";
@@ -18,7 +19,12 @@ export default class DatManager implements DatManagerInterface {
         const { storagePath, datStorageOptions } = opts;
         this.datStoragePath = storagePath;
         fs.ensureDirSync(this.datStoragePath);
-        this.dat = createNode({ path: this.datStoragePath, datStorageOptions });
+        this.dat = createNode({
+            path: this.datStoragePath,
+            datStorageOpts: datStorageOptions || {
+                secretDir: path.join(storagePath, ".dat_secrets")
+            }
+        });
     }
 
     async close() {

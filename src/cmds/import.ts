@@ -17,6 +17,7 @@ exports.handler = async function({ file, key, storagePath }) {
         const manager = new DatManager({
             storagePath
         });
+        await manager.resumeAll();
         await manager.importFiles(key, srcPath);
     } catch (error) {
         console.error(error);

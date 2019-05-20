@@ -8,8 +8,8 @@ exports.handler = async function({ dir, storagePath }) {
         const manager = new DatManager({
             storagePath
         });
-        const datKey = await manager.create(dir);
-        console.log(`Dat key: ${datKey}`);
+        const archive = await manager.create(dir);
+        console.log(`Created: ${archive.key}`);
     } catch (error) {
         console.error(error);
     }
