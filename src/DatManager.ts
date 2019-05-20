@@ -4,8 +4,8 @@ import DatManagerInterface, {
 } from "./DatManagerInterface";
 import fs from "fs-extra";
 import path from "path";
-// import { createNode } from "@ao/dat-node";
-import { createNode } from "../../dat-node"; // relative path while developing
+import { createNode } from "@ao/dat-node";
+// import { createNode } from "../../dat-node"; // relative path while developing
 import Debug from "debug";
 import DatArchive from "./DatArchive";
 import { lstatSync } from "fs";
