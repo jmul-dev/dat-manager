@@ -111,9 +111,15 @@ export default class DatManager implements DatManagerInterface {
         opts: DatDownloadOptions = {}
     ): Promise<DatArchive> {
         debug(`[${key}] attempting to download...`);
-        if (this._dats[key])
-            throw new Error(`Dat instance already exists, skipping download`);
-        let dat: DatArchive;
+        let dat: DatArchive = this._dats[key];
+        if (dat && dat.getProgress() < 1) {
+            throw new Error(
+                `Dat instance already exists, download in progress`
+            );
+        } else if (dat) {
+            // Already have completely downloaded dat, just return that
+            return dat;
+        }
         try {
             const downloadPath = path.join(this.datStoragePath, key);
             // 1. Create the dat in ram, which will then be mirrored to downloadPath
@@ -358,6 +364,13 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                             complete: dat.stats.peers.complete
                         }
                     };
+                };
+                dat.getProgress = () => {
+                    const stats = dat.stats.get();
+                    let downloadPercent = stats.downloaded / stats.length;
+                    if (dat.archive.writable) downloadPercent = 1.0;
+                    if (!Number.isFinite(downloadPercent)) downloadPercent = 0;
+                    return downloadPercent;
                 };
                 resolve(dat);
             }

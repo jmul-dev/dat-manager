@@ -10,6 +10,7 @@ export default interface DatArchive {
     importFiles(srcDir?: string, opts?: object, cb?: Function): EventEmitter;
     close(cb?: Function);
     trackStats(): EventEmitter;
+    getProgress(): number;
     stats: {
         get(): {
             files: number;
