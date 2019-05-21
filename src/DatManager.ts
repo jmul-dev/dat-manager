@@ -3,61 +3,214 @@ import DatManagerInterface, {
     DatManagerOptions
 } from "./DatManagerInterface";
 import fs from "fs-extra";
-import path from "path";
-import { createNode } from "@ao/dat-node";
-// import { createNode } from "../../dat-node"; // relative path while developing
+import path, { resolve, join } from "path";
+import Dat from "dat-node";
 import Debug from "debug";
 import DatArchive from "./DatArchive";
-import { lstatSync } from "fs";
+import Datastore from "nedb";
+import signatures from "sodium-signatures";
+import datEncoding from "dat-encoding";
+import ram from "random-access-memory";
+import mirror from "mirror-folder";
 const debug = Debug(`ao:dat-manager`);
 
+interface DatDbEntry {
+    key: string;
+    path: string;
+    writable?: boolean;
+}
+
 export default class DatManager implements DatManagerInterface {
+    public DOWNLOAD_PROGRESS_TIMEOUT = 10000;
     private datStoragePath;
-    private dat;
+    private _db: Datastore;
+    private _dats: { [key: string]: DatArchive } = {};
 
     constructor(opts: DatManagerOptions) {
         const { storagePath, datStorageOptions } = opts;
         this.datStoragePath = storagePath;
         fs.ensureDirSync(this.datStoragePath);
-        this.dat = createNode({
-            path: this.datStoragePath,
-            datStorageOpts: datStorageOptions || {
-                secretDir: path.join(storagePath, ".dat_secrets")
-            }
+        this._db = new Datastore({
+            filename: path.join(storagePath, "dats.json"),
+            autoload: true
+        });
+        this._db.ensureIndex({
+            fieldName: "key",
+            unique: true
         });
     }
 
     async close() {
-        await this.dat.close();
+        for (const key in this._dats) {
+            if (this._dats.hasOwnProperty(key)) {
+                const dat: DatArchive = this._dats[key];
+                try {
+                    await closeDat(dat);
+                } catch (error) {
+                    /* lost in space */
+                }
+            }
+        }
     }
 
     async resumeAll() {
-        await this.dat.resumeAll();
+        const entries: Array<DatDbEntry> = await new Promise(
+            (resolve, reject) => {
+                this._db.find({}, function(err, entries) {
+                    if (err) reject(err);
+                    else resolve(entries || []);
+                });
+            }
+        );
+        for (const entry of entries) {
+            const { key } = entry;
+            let dat: DatArchive;
+            try {
+                if (this._dats[key])
+                    throw new Error(
+                        `Dat instance already exists, cannot resume`
+                    );
+                dat = await createDat(entry.path, { key: key });
+                await joinNetwork(dat);
+                this._dats[key] = dat;
+                debug(`[${key}] resumed dat`);
+            } catch (error) {
+                if (dat) await closeDat(dat);
+                debug(`[${key}] failed to resume dat: ${error.message}`);
+            }
+        }
     }
 
     exists(key: string): boolean {
-        return this.dat.exists(key);
+        if (this._dats[key]) return true;
+        return false;
     }
 
     async get(key: string): Promise<DatArchive> {
-        if (this.dat.exists(key)) return this.dat.getArchive(key);
-        throw new Error(`Dat does not exist`);
+        if (this._dats[key]) return this._dats[key];
+        const datDir = path.join(this.datStoragePath, key);
+        if (!fs.existsSync(datDir)) throw new Error(`Dat not found in storage`);
+        const dat: DatArchive = await new Promise((resolve, reject) => {
+            Dat(
+                datDir,
+                {
+                    key
+                },
+                function(err, dat) {
+                    if (err) reject(err);
+                    else resolve(dat);
+                }
+            );
+        });
+        this._dats[key] = dat;
+        return dat;
     }
 
     async download(
         key: string,
         opts: DatDownloadOptions = {}
     ): Promise<DatArchive> {
-        debug(`[${key}] attempting download...`);
-        if (opts.resolveOnStart) {
+        debug(`[${key}] attempting to download...`);
+        if (this._dats[key])
+            throw new Error(`Dat instance already exists, skipping download`);
+        let dat: DatArchive;
+        try {
+            const downloadPath = path.join(this.datStoragePath, key);
+            // 1. Create the dat in ram, which will then be mirrored to downloadPath
+            dat = await createDat(ram, { key, sparse: true });
+            // 2. Join network to start connecting to peers
+            const network = await joinNetwork(dat);
+            // 3. On first connection, trigger the download & mirror
+            await new Promise((_resolve, _reject) => {
+                let responded = false;
+                let timeoutId;
+
+                const reject = err => {
+                    if (responded) return;
+                    responded = true;
+                    _reject(err);
+                };
+                const resolve = (data?) => {
+                    if (responded) return;
+                    responded = true;
+                    clearTimeout(timeoutId);
+                    _resolve(data);
+                };
+
+                // Start timeout early
+                timeoutPromise(this.DOWNLOAD_PROGRESS_TIMEOUT, reject);
+
+                network.once("connection", () => {
+                    debug(`[${key}] connection made`);
+                });
+                dat.archive.metadata.update(() => {
+                    debug(`[${key}] metadata update`);
+                    const progress = mirror(
+                        { fs: dat.archive, name: "/" },
+                        downloadPath,
+                        async err => {
+                            try {
+                                if (err) throw err;
+                                // 4. Mirror complete
+                                debug(`[${key}] mirror complete`);
+                                resolve();
+                            } catch (error) {
+                                reject(error);
+                            }
+                        }
+                    );
+                    progress.on("put-data", onProgressUpdate);
+                    progress.on("error", reject);
+                });
+
+                function onProgressUpdate() {
+                    debug(`onProgressUpdate`);
+                    clearTimeout(timeoutId);
+                    timeoutId = timeoutPromise(
+                        this.DOWNLOAD_PROGRESS_TIMEOUT,
+                        reject
+                    );
+                }
+            });
+            debug(`[${key}] download promise resolved`);
+            const diskDat: DatArchive = await createDat(downloadPath, {
+                key
+            });
+            const diskDatExists = await fs.pathExists(
+                path.join(downloadPath, ".dat")
+            );
+            if (!diskDatExists) throw new Error(`.dat folder does not exist`);
+            // 5. Add dat to storage
+            await this._dbUpsert({
+                key: key,
+                path: downloadPath
+            });
+            this._dats[key] = diskDat;
+            // Close in memory dat
+            debug(`[${key}] closing ram dat`);
             try {
-                return await this.dat.getArchive(key);
+                await closeDat(dat);
             } catch (error) {
-                await this.dat.removeArchive(key);
-                throw error;
+                debug(`[${key}] error closing ram dat: ${error.message}`);
             }
-        } else {
-            return await this.dat.downloadArchive(key);
+            // Join network with the disk dat
+            debug(`[${key}] joining network...`);
+            await joinNetwork(diskDat);
+            debug(`[${key}] succesffuly downloaded and joined network!`);
+            return diskDat;
+        } catch (error) {
+            try {
+                // try to cleanup
+                await closeDat(dat);
+                await this.remove(key);
+            } catch (error) {
+                debug(
+                    `[${key}] error cleaning up after failed download: ${
+                        error.message
+                    }`
+                );
+            }
+            throw error;
         }
     }
 
@@ -67,22 +220,20 @@ export default class DatManager implements DatManagerInterface {
      * @param srcPath
      */
     async create(srcPath: string): Promise<DatArchive> {
-        debug(`attempting to create dat, initial data: ${srcPath}`);
-        const archive = await this.dat.createArchive({});
-        debug(`[${archive.key}] created`);
-        if (await fs.pathExists(srcPath)) {
-            if (lstatSync(srcPath).isDirectory()) {
-                debug(`[${archive.key}] importing directory...`);
-            } else {
-                debug(`[${archive.key}] importing file...`);
-                // const filename = srcPath.split("/").pop();
-                // const storageContents = await fs.readFile(srcPath);
-                // await archive.writeFile(`/${filename}`, storageContents);
-            }
-            await archive.writeFileFromDisk(srcPath);
-            debug(`[${archive.key}] import succesful!`);
-        }
-        return archive;
+        const kp = signatures.keyPair();
+        const keyBuf = kp.publicKey;
+        const secretKey = kp.secretKey;
+        const key = datEncoding.toStr(keyBuf);
+        const newDatDir = path.join(this.datStoragePath, key);
+        debug(`[${key}] initializing dat instance...`);
+        const dat: DatArchive = await createDat(newDatDir, { key, secretKey });
+        this._dats[key] = dat;
+        debug(`[${key}] dat instance initialized, importing files...`);
+        await this.importFiles(key, srcPath);
+        debug(`[${key}] storing dat in persisted storage...`);
+        await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
+        debug(`[${key}] dat created and stored!`);
+        return dat;
     }
 
     /**
@@ -93,12 +244,25 @@ export default class DatManager implements DatManagerInterface {
      */
     async importFiles(key: string, srcPath: string) {
         debug(`[${key}] import: ${srcPath}`);
-        if (!(await fs.pathExists(srcPath)))
-            throw new Error(`invalid import path`);
-        if (!this.dat.exists(key))
-            throw new Error(`cannot import files, dat does not exist`);
-        const archive = await this.dat.getArchive(key);
-        await archive.writeFileFromDisk(srcPath);
+        const dat: DatArchive = await this.get(key);
+        if (!dat.writable)
+            throw new Error(`Cannot import files on a non-writable dat`);
+        await new Promise((resolve, reject) => {
+            let filesImported = 0;
+            const progress = dat.importFiles(
+                srcPath,
+                { keepExisting: true, count: false },
+                err => {
+                    if (err) return reject(err);
+                    debug(`[${key}] ${filesImported} imported files!`);
+                    resolve({ filesImported });
+                }
+            );
+            progress.on("put", (src, dest) => {
+                filesImported++;
+                debug(`[${key}] imported file: ${dest.name}`);
+            });
+        });
         debug(`[${key}] import success`);
     }
 
@@ -108,15 +272,109 @@ export default class DatManager implements DatManagerInterface {
      * @param {string} key
      */
     async remove(key: string) {
-        debug(`[${key}] remove()`);
-        if (!this.dat.exists(key))
-            throw new Error(`cannot remove dat, does not exist`);
-        await this.dat.removeArchive(key);
+        debug(`[${key}] removing...`);
+        const dat: DatArchive = this._dats[key];
+        // 1. If we have dat instance, close it up
+        if (dat) {
+            debug(`[${key}] closing dat instance...`);
+            await closeDat(dat);
+            this._dats[key] = null;
+        }
+        // 2. Remove from persisted storage
+        debug(`[${key}] removing from db...`);
+        await this._dbRemove(key);
+        // 3. Remove from disk
+        const datDir = path.join(this.datStoragePath, key);
+        const dirExists = await fs.pathExists(datDir);
+        if (dirExists) {
+            debug(`[${key}] removing from disk...`);
+            await fs.remove(datDir);
+        }
         debug(`[${key}] succesfully removed!`);
     }
 
     list() {
-        return this.dat.listKeys();
+        return Object.keys(this._dats);
+    }
+
+    private async _dbUpsert(data: DatDbEntry): Promise<any> {
+        if (!data.key) throw new Error(`upsert requires key`);
+        return new Promise((resolve, reject) => {
+            this._db.update({ key: data.key }, data, { upsert: true }, err => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+    }
+    private async _dbRemove(key: string): Promise<any> {
+        this._db.remove({ key }, {}, function(
+            error: Error,
+            numRemoved: number
+        ) {
+            resolve();
+        });
+    }
+}
+
+function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
+    return new Promise((resolve, reject) => {
+        const datOptions = options || {};
+        if (typeof storagePath === "string") {
+            fs.ensureDirSync(storagePath);
+        }
+        Dat(storagePath, datOptions, (err: Error, dat: DatArchive) => {
+            if (err) reject(err);
+            else {
+                dat.trackStats();
+                dat.getPath = () => storagePath;
+                resolve(dat);
+            }
+        });
+    });
+}
+
+async function closeDat(dat: DatArchive): Promise<any> {
+    return new Promise((resolve, reject) => {
+        if (!dat || !dat.close) return resolve();
+        dat.close(resolve);
+    });
+}
+
+async function joinNetwork(dat): Promise<any> {
+    return new Promise((resolve, reject) => {
+        const network = dat.joinNetwork();
+        network.on("listening", () => {
+            resolve(network);
+        });
+        network.on("error", error => {
+            if (error.code !== "EADDRINUSE") {
+                reject(error);
+            }
+        });
+    });
+}
+
+async function ensurePeerConnected(
+    network,
+    timeout: number = 5000
+): Promise<any> {
+    return checkExit(timeout);
+    async function checkExit(timeout: number): Promise<any> {
+        console.log(`checkExit with timeout: ${timeout}`);
+        if (timeout <= 0)
+            return Promise.reject(new Error(`Peer connection timeout`));
+        if (network.connected) {
+            console.log(`network.connected = true`);
+            return Promise.resolve();
+        }
+        if (network.connecting) {
+            await sleep(1000);
+            return checkExit(timeout - 1000);
+        }
+        // not connected or connecting
+        return Promise.reject(
+            new Error(`Unable to establish network connection`)
+        );
     }
 }
 
@@ -124,4 +382,10 @@ async function sleep(ms: number): Promise<any> {
     return new Promise(resolve => {
         setTimeout(resolve, ms);
     });
+}
+
+function timeoutPromise(ms, rejection): NodeJS.Timeout {
+    return setTimeout(() => {
+        rejection(new Error(`promise timed out`));
+    }, ms);
 }

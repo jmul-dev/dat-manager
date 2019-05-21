@@ -9,7 +9,7 @@ exports.handler = async function({ dir, storagePath }) {
             storagePath
         });
         const archive = await manager.create(dir);
-        console.log(`Created: ${archive.key}`);
+        console.log(`Created: ${archive.key.toString("hex")}`);
     } catch (error) {
         console.error(error);
     }

@@ -1,16 +1,33 @@
+import { EventEmitter } from "events";
+import hyperdrive from "hyperdrive";
+
 export default interface DatArchive {
-    key: string;
-    url: string;
-    hyperdrive: object;
-    readFile(filepath: string, opts?: Object): Promise<string>;
-    writeFile(filepath: string, data: string, opts?: Object): Promise<any>;
-    writeFileFromDisk(
-        srcPath: string,
-        dstPath: string,
-        opts?: Object
-    ): Promise<any>;
-    download(filepath: string, opts?: Object): Promise<any>;
-    stats(): DatStats;
+    key: Buffer;
+    writable: boolean;
+    archive: hyperdrive;
+    metadata: hyperdrive;
+    importFiles(srcDir?: string, opts?: object, cb?: Function): EventEmitter;
+    close(cb?: Function);
+    trackStats(): EventEmitter;
+    stats: {
+        get(): {
+            files: number;
+            byteLength: number;
+            length: number;
+            version: number;
+            downloaded: number;
+        };
+        network: {
+            downloadSpeed: number;
+            uploadSpeed: number;
+            downloadTotal: number;
+            uploadTotal: number;
+        };
+        peers: {
+            total: number;
+            complete: number;
+        };
+    } & EventEmitter;
     getPath(): string;
 }
 
