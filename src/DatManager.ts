@@ -360,7 +360,9 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                         writer: dat.writable,
                         version: dat.archive.version || stats.version,
                         files: stats.files,
-                        blocksDownlaoded: stats.downloaded,
+                        blocksDownlaoded: dat.writable
+                            ? stats.length
+                            : stats.downloaded,
                         blocksLength: stats.length,
                         byteLength: stats.byteLength,
                         progress: downloadPercent,
