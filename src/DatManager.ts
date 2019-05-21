@@ -138,6 +138,7 @@ export default class DatManager implements DatManagerInterface {
                 treeCacheSize: 2048,
                 ...this.datStorageOptions
             });
+            this._dats[key] = dat;
             // 2. Join network to start connecting to peers
             const network = await joinNetwork(dat);
             // 3. On first connection, trigger the download & mirror
@@ -236,7 +237,6 @@ export default class DatManager implements DatManagerInterface {
                     }), attempt to clean up...`
                 );
                 // try to cleanup
-                await closeDat(dat);
                 await this.remove(key);
             } catch (error) {
                 debug(
