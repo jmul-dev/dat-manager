@@ -89,7 +89,8 @@ export default class DatManager implements DatManagerInterface {
     async get(key: string): Promise<DatArchive> {
         if (this._dats[key]) return this._dats[key];
         const datDir = path.join(this.datStoragePath, key);
-        if (!fs.existsSync(datDir)) throw new Error(`Dat not found in storage`);
+        const datDirExists = await fs.pathExists(datDir);
+        if (!datDirExists) throw new Error(`Dat not found in storage`);
         const dat: DatArchive = await new Promise((resolve, reject) => {
             Dat(
                 datDir,
@@ -136,10 +137,13 @@ export default class DatManager implements DatManagerInterface {
             await new Promise((_resolve, _reject) => {
                 let responded = false;
                 let timeoutId;
+                let progress;
 
                 const reject = err => {
                     if (responded) return;
                     responded = true;
+                    if (progress && typeof progress.destroy === "function")
+                        progress.destroy();
                     _reject(err);
                 };
                 const resolve = (data?) => {
@@ -157,7 +161,7 @@ export default class DatManager implements DatManagerInterface {
                 });
                 dat.archive.metadata.update(() => {
                     debug(`[${key}] metadata update`);
-                    const progress = mirror(
+                    progress = mirror(
                         { fs: dat.archive, name: "/" },
                         downloadPath,
                         async err => {
