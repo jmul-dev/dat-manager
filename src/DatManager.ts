@@ -393,7 +393,7 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                         byteLength: stats.byteLength,
                         progress: downloadPercent,
                         network: {
-                            connected: dat.connected,
+                            connected: dat.network.connected,
                             downloadSpeed: dat.stats.network.downloadSpeed,
                             uploadSpeed: dat.stats.network.uploadSpeed,
                             downloadTotal: dat.stats.network.downloadTotal,
@@ -427,11 +427,15 @@ async function closeDat(dat: DatArchive): Promise<any> {
 
 async function joinNetwork(dat): Promise<any> {
     return new Promise((resolve, reject) => {
-        const network = dat.joinNetwork();
-        network.on("listening", () => {
+        const network = dat.joinNetwork(error => {
+            if (error) return reject(error);
             dat.connected = true;
-            resolve(network);
+            resolve();
         });
+        // network.on("listening", () => {
+        //     dat.connected = true;
+        //     resolve(network);
+        // });
         network.on("error", error => {
             if (error.code !== "EADDRINUSE") {
                 debug(
