@@ -32,7 +32,10 @@ export default class DatManager implements DatManagerInterface {
         fs.ensureDirSync(this.datStoragePath);
         this._db = new Datastore({
             filename: path.join(storagePath, "dats.json"),
-            autoload: true
+            autoload: true,
+            onload: error => {
+                if (error) debug(`Error loading dats db: ${error.message}`);
+            }
         });
         this._db.ensureIndex({
             fieldName: "key",
@@ -47,7 +50,9 @@ export default class DatManager implements DatManagerInterface {
                 try {
                     await closeDat(dat);
                 } catch (error) {
-                    /* lost in space */
+                    debug(
+                        `[${key}] error attempting to close: ${error.message}`
+                    );
                 }
             }
         }
@@ -335,6 +340,10 @@ export default class DatManager implements DatManagerInterface {
             error: Error,
             numRemoved: number
         ) {
+            if (error)
+                debug(
+                    `[${key}] error removing entry from db: ${error.message}`
+                );
             resolve();
         });
     }
@@ -408,6 +417,11 @@ async function joinNetwork(dat): Promise<any> {
         });
         network.on("error", error => {
             if (error.code !== "EADDRINUSE") {
+                debug(
+                    `[${dat.key.toString("hex")}] network error: ${
+                        error.message
+                    }`
+                );
                 reject(error);
             }
         });
