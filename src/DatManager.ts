@@ -81,10 +81,10 @@ export default class DatManager implements DatManagerInterface {
                     throw new Error(
                         `Dat instance already exists, cannot resume`
                     );
-                let options = { key };
-                if (entry.writable)
-                    options = { key, ...this.datStorageOptions };
-                dat = await createDat(entry.path, options);
+                dat = await createDat(entry.path, {
+                    key,
+                    ...this.datStorageOptions
+                });
                 await joinNetwork(dat);
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
@@ -105,7 +105,10 @@ export default class DatManager implements DatManagerInterface {
         const datDir = path.join(this.datStoragePath, key);
         const datDirExists = await fs.pathExists(datDir);
         if (!datDirExists) throw new Error(`Dat not found in storage`);
-        const dat: DatArchive = await createDat(datDir, { key });
+        const dat: DatArchive = await createDat(datDir, {
+            key,
+            ...this.datStorageOptions
+        });
         this._dats[key] = dat;
         return dat;
     }
@@ -132,7 +135,8 @@ export default class DatManager implements DatManagerInterface {
                 sparse: true,
                 metadataStorageCacheSize: 0,
                 contentStorageCacheSize: 0,
-                treeCacheSize: 2048
+                treeCacheSize: 2048,
+                ...this.datStorageOptions
             });
             // 2. Join network to start connecting to peers
             const network = await joinNetwork(dat);
@@ -199,7 +203,8 @@ export default class DatManager implements DatManagerInterface {
             });
             debug(`[${key}] download promise resolved`);
             const diskDat: DatArchive = await createDat(downloadPath, {
-                key
+                key,
+                ...this.datStorageOptions
             });
             const diskDatExists = await fs.pathExists(
                 path.join(downloadPath, ".dat")
