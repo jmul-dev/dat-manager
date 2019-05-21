@@ -230,6 +230,11 @@ export default class DatManager implements DatManagerInterface {
             return diskDat;
         } catch (error) {
             try {
+                debug(
+                    `[${key}] caught error during download process (${
+                        error.message
+                    }), attempt to clean up...`
+                );
                 // try to cleanup
                 await closeDat(dat);
                 await this.remove(key);
@@ -314,16 +319,21 @@ export default class DatManager implements DatManagerInterface {
         if (dat) {
             debug(`[${key}] closing dat instance...`);
             await closeDat(dat);
+            debug(`[${key}] dat instance closed`);
             this._dats[key] = null;
         }
         // 2. Remove from persisted storage
         debug(`[${key}] removing from db...`);
         await this._dbRemove(key);
+        debug(`[${key}] removed from db`);
         // 3. Remove from disk
         const datDir = path.join(this.datStoragePath, key);
         const dirExists = await fs.pathExists(datDir);
         if (dirExists) {
             debug(`[${key}] removing from disk...`);
+            await sleep(
+                500
+            ); /* For some reason dat close may hang on to fd longer than it should */
             await fs.remove(datDir);
         }
         debug(`[${key}] succesfully removed!`);
