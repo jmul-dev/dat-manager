@@ -4,6 +4,7 @@ import hyperdrive from "hyperdrive";
 export default interface DatArchive {
     key: Buffer;
     writable: boolean;
+    connected: boolean;
     archive: hyperdrive;
     metadata: hyperdrive;
     importFiles(srcDir?: string, opts?: object, cb?: Function): EventEmitter;
@@ -28,6 +29,7 @@ export default interface DatArchive {
             complete: number;
         };
     } & EventEmitter;
+    getStats(): DatStats;
     getPath(): string;
 }
 

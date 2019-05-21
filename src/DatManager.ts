@@ -327,6 +327,32 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             else {
                 dat.trackStats();
                 dat.getPath = () => storagePath;
+                dat.getStats = () => {
+                    const stats = dat.stats.get();
+                    let downloadPercent = stats.downloaded / stats.length;
+                    if (dat.archive.writable) downloadPercent = 1.0;
+                    return {
+                        key: dat.key.toString("hex"),
+                        writer: dat.writable,
+                        version: dat.archive.version || stats.version,
+                        files: stats.files,
+                        blocksDownlaoded: stats.downloaded,
+                        blocksLength: stats.length,
+                        byteLength: stats.byteLength,
+                        progress: downloadPercent,
+                        network: {
+                            connected: dat.connected,
+                            downloadSpeed: dat.stats.network.downloadSpeed,
+                            uploadSpeed: dat.stats.network.uploadSpeed,
+                            downloadTotal: dat.stats.network.downloadTotal,
+                            uploadTotal: dat.stats.network.uploadTotal
+                        },
+                        peers: {
+                            total: dat.stats.peers.total,
+                            complete: dat.stats.peers.complete
+                        }
+                    };
+                };
                 resolve(dat);
             }
         });
@@ -344,6 +370,7 @@ async function joinNetwork(dat): Promise<any> {
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork();
         network.on("listening", () => {
+            dat.connected = true;
             resolve(network);
         });
         network.on("error", error => {
