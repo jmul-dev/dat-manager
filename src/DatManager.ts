@@ -159,6 +159,13 @@ export default class DatManager implements DatManagerInterface {
                 network.once("connection", () => {
                     debug(`[${key}] connection made`);
                 });
+                dat.archive.on("ready", () => {
+                    debug(`[${key}] archive ready`);
+                });
+                dat.archive.on("error", error => {
+                    debug(`[${key}] archive error: ${error.message}`);
+                    reject(error);
+                });
                 dat.archive.metadata.update(() => {
                     debug(`[${key}] metadata update`);
                     progress = mirror(
@@ -180,7 +187,6 @@ export default class DatManager implements DatManagerInterface {
                 });
 
                 const onProgressUpdate = () => {
-                    debug(`onProgressUpdate`);
                     clearTimeout(timeoutId);
                     timeoutId = timeoutPromise(
                         this.DOWNLOAD_PROGRESS_TIMEOUT,
@@ -246,6 +252,8 @@ export default class DatManager implements DatManagerInterface {
         this._dats[key] = dat;
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
+        debug(`[${key}] files imported, joining network...`);
+        await joinNetwork(dat);
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
         debug(`[${key}] dat created and stored!`);
