@@ -23,12 +23,18 @@ interface DatDbEntry {
 export default class DatManager implements DatManagerInterface {
     public DOWNLOAD_PROGRESS_TIMEOUT = 16000;
     private datStoragePath;
+    // see dat-storage package
+    private datStorageOptions: {
+        secretDir?: string;
+        prefix?: string;
+    };
     private _db: Datastore;
     private _dats: { [key: string]: DatArchive } = {};
 
     constructor(opts: DatManagerOptions) {
         const { storagePath, datStorageOptions } = opts;
         this.datStoragePath = storagePath;
+        this.datStorageOptions = datStorageOptions || {};
         fs.ensureDirSync(this.datStoragePath);
         this._db = new Datastore({
             filename: path.join(storagePath, "dats.json"),
@@ -75,7 +81,10 @@ export default class DatManager implements DatManagerInterface {
                     throw new Error(
                         `Dat instance already exists, cannot resume`
                     );
-                dat = await createDat(entry.path, { key: key });
+                let options = { key };
+                if (entry.writable)
+                    options = { key, ...this.datStorageOptions };
+                dat = await createDat(entry.path, options);
                 await joinNetwork(dat);
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
@@ -96,18 +105,7 @@ export default class DatManager implements DatManagerInterface {
         const datDir = path.join(this.datStoragePath, key);
         const datDirExists = await fs.pathExists(datDir);
         if (!datDirExists) throw new Error(`Dat not found in storage`);
-        const dat: DatArchive = await new Promise((resolve, reject) => {
-            Dat(
-                datDir,
-                {
-                    key
-                },
-                function(err, dat) {
-                    if (err) reject(err);
-                    else resolve(dat);
-                }
-            );
-        });
+        const dat: DatArchive = await createDat(datDir, { key });
         this._dats[key] = dat;
         return dat;
     }
@@ -253,7 +251,11 @@ export default class DatManager implements DatManagerInterface {
         const key = datEncoding.toStr(keyBuf);
         const newDatDir = path.join(this.datStoragePath, key);
         debug(`[${key}] initializing dat instance...`);
-        const dat: DatArchive = await createDat(newDatDir, { key, secretKey });
+        const dat: DatArchive = await createDat(newDatDir, {
+            key,
+            secretKey,
+            ...this.datStorageOptions
+        });
         this._dats[key] = dat;
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
