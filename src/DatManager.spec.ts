@@ -40,6 +40,7 @@ describe("DatManager Test Suite", () => {
             const expectedFilePath = path.join(archive.getPath(), "testA.json");
             const contents = await fs.readJson(expectedFilePath);
             expect(contents.DEAD).to.equal("BEEF");
+            expect(await dat.exists(archive.key.toString("hex"))).to.be.true;
         });
 
         it("should import files from disk to an existing dat", async function() {

@@ -21,7 +21,7 @@ interface DatDbEntry {
 }
 
 export default class DatManager implements DatManagerInterface {
-    public DOWNLOAD_PROGRESS_TIMEOUT = 10000;
+    public DOWNLOAD_PROGRESS_TIMEOUT = 16000;
     private datStoragePath;
     private _db: Datastore;
     private _dats: { [key: string]: DatArchive } = {};
@@ -117,7 +117,13 @@ export default class DatManager implements DatManagerInterface {
         try {
             const downloadPath = path.join(this.datStoragePath, key);
             // 1. Create the dat in ram, which will then be mirrored to downloadPath
-            dat = await createDat(ram, { key, sparse: true });
+            dat = await createDat(ram, {
+                key,
+                sparse: true,
+                metadataStorageCacheSize: 0,
+                contentStorageCacheSize: 0,
+                treeCacheSize: 2048
+            });
             // 2. Join network to start connecting to peers
             const network = await joinNetwork(dat);
             // 3. On first connection, trigger the download & mirror
@@ -163,14 +169,14 @@ export default class DatManager implements DatManagerInterface {
                     progress.on("error", reject);
                 });
 
-                function onProgressUpdate() {
+                const onProgressUpdate = () => {
                     debug(`onProgressUpdate`);
                     clearTimeout(timeoutId);
                     timeoutId = timeoutPromise(
                         this.DOWNLOAD_PROGRESS_TIMEOUT,
                         reject
                     );
-                }
+                };
             });
             debug(`[${key}] download promise resolved`);
             const diskDat: DatArchive = await createDat(downloadPath, {
