@@ -30,6 +30,11 @@ export default interface DatArchive {
             complete: number;
         };
     } & EventEmitter;
+    network: {
+        connected: boolean;
+        connecting: boolean;
+        close(cb?: Function);
+    } & EventEmitter;
     getStats(): DatStats;
     getPath(): string;
 }
