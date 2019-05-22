@@ -140,7 +140,7 @@ export default class DatManager implements DatManagerInterface {
             });
             this._dats[key] = dat;
             // 2. Join network to start connecting to peers
-            const network = await joinNetwork(dat);
+            const network = await joinNetwork(dat, true);
             // 3. On first connection, trigger the download & mirror
             await new Promise((_resolve, _reject) => {
                 let responded = false;
@@ -425,17 +425,31 @@ async function closeDat(dat: DatArchive): Promise<any> {
     });
 }
 
-async function joinNetwork(dat): Promise<any> {
+/**
+ * Note that joinNetwork callback is not called until the first round of discovery is complete.
+ * This is mostly useful for downloading/cloning a dat and not so much while sharing a local dat.
+ *
+ * @param dat
+ * @param resolveOnNetworkCallback
+ */
+async function joinNetwork(
+    dat,
+    resolveOnNetworkCallback: boolean = false
+): Promise<any> {
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork(error => {
             if (error) return reject(error);
-            dat.connected = true;
-            resolve();
+            if (resolveOnNetworkCallback) {
+                dat.connected = true;
+                resolve(network);
+            }
         });
-        // network.on("listening", () => {
-        //     dat.connected = true;
-        //     resolve(network);
-        // });
+        network.on("listening", () => {
+            if (!resolveOnNetworkCallback) {
+                dat.connected = true;
+                resolve(network);
+            }
+        });
         network.on("error", error => {
             if (error.code !== "EADDRINUSE") {
                 debug(
