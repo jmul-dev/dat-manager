@@ -139,10 +139,8 @@ export default class DatManager implements DatManagerInterface {
                 ...this.datStorageOptions
             });
             this._dats[key] = dat;
-            // 2. Join network to start connecting to peers
-            const network = await joinNetwork(dat, true);
-            // 3. On first connection, trigger the download & mirror
-            await new Promise((_resolve, _reject) => {
+            // 2. Here we join the network, trigger download, and set a timeout so that we can catch stalled downloads
+            await new Promise(async (_resolve, _reject) => {
                 let responded = false;
                 let timeoutId;
                 let progress;
@@ -167,9 +165,6 @@ export default class DatManager implements DatManagerInterface {
                     reject
                 );
 
-                network.once("connection", () => {
-                    debug(`[${key}] connection made`);
-                });
                 dat.archive.on("error", error => {
                     debug(`[${key}] archive error: ${error.message}`);
                     reject(error);
@@ -196,6 +191,11 @@ export default class DatManager implements DatManagerInterface {
                     progress.on("error", reject);
                     // reset timeout
                     onProgressUpdate();
+                });
+
+                const network = await joinNetwork(dat, true);
+                network.once("connection", () => {
+                    debug(`[${key}] connection made`);
                 });
 
                 const onProgressUpdate = () => {
