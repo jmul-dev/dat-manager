@@ -6,7 +6,7 @@ import fs from "fs-extra";
 import path, { resolve, join } from "path";
 import Dat from "dat-node";
 import Debug from "debug";
-import DatArchive from "./DatArchive";
+import DatArchive, { DatStats } from "./DatArchive";
 import Datastore from "nedb";
 import signatures from "sodium-signatures";
 import datEncoding from "dat-encoding";
@@ -158,13 +158,23 @@ export default class DatManager implements DatManagerInterface {
                     clearTimeout(timeoutId);
                     _resolve(data);
                 };
+                const onProgressUpdate = () => {
+                    clearTimeout(timeoutId);
+                    if (dat.getProgress() > 0 && opts.resolveOnStart === true) {
+                        resolve();
+                    } else {
+                        timeoutId = timeoutPromise(
+                            this.DOWNLOAD_PROGRESS_TIMEOUT,
+                            reject
+                        );
+                    }
+                };
 
                 // Start timeout early
                 timeoutId = timeoutPromise(
                     this.DOWNLOAD_PROGRESS_TIMEOUT,
                     reject
                 );
-
                 dat.archive.on("error", error => {
                     debug(`[${key}] archive error: ${error.message}`);
                     reject(error);
@@ -192,21 +202,45 @@ export default class DatManager implements DatManagerInterface {
                     // reset timeout
                     onProgressUpdate();
                 });
-
                 const network = await joinNetwork(dat, true);
                 network.once("connection", () => {
                     debug(`[${key}] connection made`);
                 });
-
-                const onProgressUpdate = () => {
-                    clearTimeout(timeoutId);
-                    timeoutId = timeoutPromise(
-                        this.DOWNLOAD_PROGRESS_TIMEOUT,
-                        reject
-                    );
-                };
             });
             debug(`[${key}] download promise resolved`);
+            if (!opts.resolveOnStart) await this._postDownloadProcessing(key);
+        } catch (error) {
+            try {
+                debug(
+                    `[${key}] caught error during download process (${
+                        error.message
+                    }), attempt to clean up...`
+                );
+                // try to cleanup
+                await this.remove(key);
+            } catch (error) {
+                debug(
+                    `[${key}] error cleaning up after failed download: ${
+                        error.message
+                    }`
+                );
+                throw error;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Download process involves mirroring the dat to disk, so we have to actually
+     * instantiate the dat post-download to store in db, create .dat folder, etc..
+     *
+     * @param key
+     */
+    private async _postDownloadProcessing(key) {
+        const dat = this._dats[key];
+        if (!dat) throw new Error(`Cannot post-process non-existent dat`);
+        try {
+            const downloadPath = path.join(this.datStoragePath, key);
             const diskDat: DatArchive = await createDat(downloadPath, {
                 key,
                 ...this.datStorageOptions
@@ -248,6 +282,7 @@ export default class DatManager implements DatManagerInterface {
                         error.message
                     }`
                 );
+                throw error;
             }
             throw error;
         }
@@ -381,10 +416,13 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             else {
                 dat.trackStats();
                 dat.getPath = () => storagePath;
-                dat.getStats = () => {
+                dat.getStats = (): DatStats => {
                     const stats = dat.stats.get();
                     let downloadPercent = stats.downloaded / stats.length;
                     if (dat.archive.writable) downloadPercent = 1.0;
+                    // slight hack, but if this is an in-memory dat we override the complete
+                    // state (specifically for the download process, since we initialize a disk version
+                    // after in-memory dl is complete)
                     return {
                         key: dat.key.toString("hex"),
                         writer: dat.writable,
@@ -396,6 +434,7 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                         blocksLength: stats.length,
                         byteLength: stats.byteLength,
                         progress: downloadPercent,
+                        complete: downloadPercent === 1 && storagePath !== ram,
                         network: {
                             connected: dat.connected,
                             downloadSpeed: dat.stats.network.downloadSpeed,

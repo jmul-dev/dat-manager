@@ -48,6 +48,7 @@ export type DatStats = {
     blocksLength: number;
     byteLength: number;
     progress: number;
+    complete: boolean;
     network: {
         connected: boolean;
         downloadSpeed: number;
