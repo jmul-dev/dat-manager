@@ -3,6 +3,7 @@ import DatManagerInterface, {
     DatManagerOptions
 } from "./DatManagerInterface";
 import fs from "fs-extra";
+import util from "util";
 import path, { resolve, join } from "path";
 import Dat from "dat-node";
 import Debug from "debug";
@@ -21,7 +22,7 @@ interface DatDbEntry {
 }
 
 export default class DatManager implements DatManagerInterface {
-    public DOWNLOAD_PROGRESS_TIMEOUT = 16000;
+    public DOWNLOAD_PROGRESS_TIMEOUT = 12000;
     private datStoragePath;
     // see dat-storage package
     private datStorageOptions: {
@@ -50,6 +51,7 @@ export default class DatManager implements DatManagerInterface {
     }
 
     async close() {
+        debug(`DatManager::close()`);
         for (const key in this._dats) {
             if (this._dats.hasOwnProperty(key)) {
                 const dat: DatArchive = this._dats[key];
@@ -62,6 +64,7 @@ export default class DatManager implements DatManagerInterface {
                 }
             }
         }
+        debug(`DatManager::close() -> success`);
     }
 
     async resumeAll() {
@@ -130,7 +133,7 @@ export default class DatManager implements DatManagerInterface {
         try {
             const downloadPath = path.join(this.datStoragePath, key);
             // 1. Create the dat in ram, which will then be mirrored to downloadPath
-            dat = await createDat(ram, {
+            dat = await createDat(downloadPath, {
                 key,
                 sparse: true,
                 metadataStorageCacheSize: 0,
@@ -148,23 +151,20 @@ export default class DatManager implements DatManagerInterface {
                 const reject = err => {
                     if (responded) return;
                     responded = true;
-                    if (progress && typeof progress.destroy === "function") {
-                        debug(
-                            `[${key}] attempting to destroy mirror-folder instance...`
-                        );
-                        progress.destroy();
-                    }
+                    clearTimeout(timeoutId);
+                    dat.stats.removeListener("update", onProgressUpdate);
                     _reject(err);
                 };
                 const resolve = (data?) => {
                     if (responded) return;
                     responded = true;
                     clearTimeout(timeoutId);
+                    dat.stats.removeListener("update", onProgressUpdate);
                     _resolve(data);
                 };
                 const onProgressUpdate = () => {
                     clearTimeout(timeoutId);
-                    if (dat.getProgress() > 0 && opts.resolveOnStart === true) {
+                    if (opts.resolveOnStart === true && dat.getProgress() > 0) {
                         debug(`[${key}] resolveOnStart`);
                         resolve();
                     } else {
@@ -174,12 +174,7 @@ export default class DatManager implements DatManagerInterface {
                         );
                     }
                 };
-
-                // Start timeout early
-                timeoutId = timeoutPromise(
-                    this.DOWNLOAD_PROGRESS_TIMEOUT,
-                    reject
-                );
+                dat.stats.on("update", onProgressUpdate);
                 dat.archive.on("error", error => {
                     debug(`[${key}] archive error: ${error.message}`);
                     reject(error);
@@ -193,32 +188,38 @@ export default class DatManager implements DatManagerInterface {
                         );
                         return;
                     }
-                    progress = mirror(
-                        { fs: dat.archive, name: "/" },
-                        downloadPath,
-                        async err => {
-                            try {
-                                if (err) throw err;
-                                // 4. Mirror complete
-                                debug(`[${key}] mirror complete`);
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        }
-                    );
-                    progress.on("put-data", onProgressUpdate);
-                    progress.on("error", reject);
+                    // progress = mirror(
+                    //     { fs: dat.archive, name: "/" },
+                    //     downloadPath,
+                    //     async err => {
+                    //         try {
+                    //             if (err) throw err;
+                    //             // 4. Mirror complete
+                    //             debug(`[${key}] mirror complete`);
+                    //             resolve();
+                    //         } catch (error) {
+                    //             reject(error);
+                    //         }
+                    //     }
+                    // );
+                    // progress.on("put-data", onProgressUpdate);
+                    // progress.on("error", reject);
                     // reset timeout
                     onProgressUpdate();
                 });
-                const network = await joinNetwork(dat, true);
-                network.once("connection", () => {
-                    debug(`[${key}] connection made`);
-                });
+                try {
+                    await joinNetwork(dat, true);
+                    timeoutId = timeoutPromise(
+                        this.DOWNLOAD_PROGRESS_TIMEOUT,
+                        reject
+                    );
+                } catch (error) {
+                    reject(error);
+                }
             });
             debug(`[${key}] download promise resolved`);
-            if (!opts.resolveOnStart) await this._postDownloadProcessing(key);
+            if (!opts.resolveOnStart)
+                return await this._postDownloadProcessing(key);
         } catch (error) {
             try {
                 debug(
@@ -227,6 +228,7 @@ export default class DatManager implements DatManagerInterface {
                     }), attempt to clean up...`
                 );
                 // try to cleanup
+                // await sleep(3000); // for some reason cleaning up too early causes udp crash
                 await this.remove(key);
             } catch (error) {
                 debug(
@@ -285,6 +287,7 @@ export default class DatManager implements DatManagerInterface {
                     }), attempt to clean up...`
                 );
                 // try to cleanup
+                await sleep(1000); // for some reason cleaning up too early causes udp crash
                 await this.remove(key);
             } catch (error) {
                 debug(
@@ -474,6 +477,7 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
 async function closeDat(dat: DatArchive): Promise<any> {
     return new Promise((resolve, reject) => {
         if (!dat || !dat.close) return resolve();
+        debug(util.inspect(dat, false, 3, true));
         dat.close(resolve);
     });
 }
@@ -486,17 +490,25 @@ async function closeDat(dat: DatArchive): Promise<any> {
  * @param resolveOnNetworkCallback
  */
 async function joinNetwork(
-    dat,
+    dat: DatArchive,
     resolveOnNetworkCallback: boolean = false
 ): Promise<any> {
     return new Promise((resolve, reject) => {
-        const network = dat.joinNetwork(error => {
-            if (error) return reject(error);
-            if (resolveOnNetworkCallback) {
-                dat.connected = true;
-                resolve(network);
+        const network = dat.joinNetwork(
+            {
+                dht: false,
+                hash: false,
+                utp: true,
+                tcp: true
+            },
+            error => {
+                if (error) return reject(error);
+                if (resolveOnNetworkCallback) {
+                    dat.connected = true;
+                    resolve(network);
+                }
             }
-        });
+        );
         network.on("listening", () => {
             if (!resolveOnNetworkCallback) {
                 dat.connected = true;

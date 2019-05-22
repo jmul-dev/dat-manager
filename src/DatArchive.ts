@@ -11,6 +11,8 @@ export default interface DatArchive {
     close(cb?: Function);
     trackStats(): EventEmitter;
     getProgress(): number;
+    joinNetwork(opts: Object, cb?: Function);
+    leaveNetwork();
     stats: {
         get(): {
             files: number;
