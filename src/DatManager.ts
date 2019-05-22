@@ -133,93 +133,109 @@ export default class DatManager implements DatManagerInterface {
         try {
             const downloadPath = path.join(this.datStoragePath, key);
             // 1. Create the dat in ram, which will then be mirrored to downloadPath
-            dat = await createDat(downloadPath, {
+            dat = await createDat(ram, {
                 key,
                 sparse: true,
-                metadataStorageCacheSize: 0,
-                contentStorageCacheSize: 0,
-                treeCacheSize: 2048,
+                // metadataStorageCacheSize: 0,
+                // contentStorageCacheSize: 0,
+                // treeCacheSize: 2048,
                 ...this.datStorageOptions
             });
             this._dats[key] = dat;
-            // 2. Here we join the network, trigger download, and set a timeout so that we can catch stalled downloads
-            await new Promise(async (_resolve, _reject) => {
+            debug(`[${key}] ram dat initialized`);
+            // 2. Join network and esure that we make a succesful connection in a timely manner
+            const network = await joinNetwork(dat, true);
+            debug(`[${key}] network joined, ensuring peer connection...`);
+            await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
+            debug(`[${key}] peer connection(s) has been made`);
+            // 3. Wait for initial metadata sync if not the owner
+            if (!dat.archive.writable && !dat.archive.metadata.length) {
+                debug(
+                    `[${key}] metadata does not exist, await initial sync...`
+                );
+                await new Promise((resolve, reject) => {
+                    let timeoutId = setTimeout(() => {
+                        reject(
+                            new Error(`timed out while pulling in metadata`)
+                        );
+                    }, this.DOWNLOAD_PROGRESS_TIMEOUT);
+                    dat.archive.metadata.update(err => {
+                        clearTimeout(timeoutId);
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+                debug(`[${key}] initial metadata sync`);
+            }
+            // 4. always download all metadata
+            if (!dat.archive.writable) {
+                dat.archive.metadata.download({ start: 0, end: -1 });
+            }
+            // 5. Mirroring ram archive to disk
+            const downloadPromise = new Promise(async (_resolve, _reject) => {
                 let responded = false;
-                let timeoutId;
                 let progress;
 
                 const reject = err => {
                     if (responded) return;
                     responded = true;
-                    clearTimeout(timeoutId);
-                    dat.stats.removeListener("update", onProgressUpdate);
+                    dat.stats.removeListener("update", logDownloadStats);
                     _reject(err);
                 };
                 const resolve = (data?) => {
                     if (responded) return;
                     responded = true;
-                    clearTimeout(timeoutId);
-                    dat.stats.removeListener("update", onProgressUpdate);
+                    dat.stats.removeListener("update", logDownloadStats);
                     _resolve(data);
                 };
-                const onProgressUpdate = () => {
-                    clearTimeout(timeoutId);
-                    if (opts.resolveOnStart === true && dat.getProgress() > 0) {
-                        debug(`[${key}] resolveOnStart`);
-                        resolve();
-                    } else {
-                        timeoutId = timeoutPromise(
-                            this.DOWNLOAD_PROGRESS_TIMEOUT,
-                            reject
-                        );
-                    }
-                };
-                dat.stats.on("update", onProgressUpdate);
-                dat.archive.on("error", error => {
-                    debug(`[${key}] archive error: ${error.message}`);
-                    reject(error);
-                });
-                dat.archive.metadata.update(() => {
-                    debug(`[${key}] metadata update`);
-                    // race condition, if we hit timeout before this callback do not proceed!
-                    if (responded) {
-                        debug(
-                            `[${key}] metadata update triggered after we already responded...`
-                        );
-                        return;
-                    }
-                    // progress = mirror(
-                    //     { fs: dat.archive, name: "/" },
-                    //     downloadPath,
-                    //     async err => {
-                    //         try {
-                    //             if (err) throw err;
-                    //             // 4. Mirror complete
-                    //             debug(`[${key}] mirror complete`);
-                    //             resolve();
-                    //         } catch (error) {
-                    //             reject(error);
-                    //         }
-                    //     }
-                    // );
-                    // progress.on("put-data", onProgressUpdate);
-                    // progress.on("error", reject);
-                    // reset timeout
-                    onProgressUpdate();
-                });
-                try {
-                    await joinNetwork(dat, true);
-                    timeoutId = timeoutPromise(
-                        this.DOWNLOAD_PROGRESS_TIMEOUT,
-                        reject
+                const logDownloadStats = () => {
+                    debug(
+                        `[${key}] progress: ${(dat.getProgress() * 100).toFixed(
+                            1
+                        )}`
                     );
-                } catch (error) {
-                    reject(error);
-                }
+                };
+                dat.stats.on("update", logDownloadStats);
+                // mirror download to disk
+                progress = mirror(
+                    { fs: dat.archive, name: "/" },
+                    downloadPath,
+                    async err => {
+                        try {
+                            if (err) throw err;
+                            // Mirror complete
+                            debug(`[${key}] mirror complete`);
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                );
+                progress.on("error", reject);
             });
-            debug(`[${key}] download promise resolved`);
-            if (!opts.resolveOnStart)
+            // 6. Download may resolve once the download is complete, or once the download has
+            // started. This difference is waiting on downloadPromise.
+            if (!opts.resolveOnStart) {
+                await downloadPromise;
+                debug(
+                    `[${key}] resolving completed download, handoff to post process`
+                );
                 return await this._postDownloadProcessing(key);
+            } else {
+                debug(`[${key}] resolving download on start`);
+                downloadPromise
+                    .then(() => {
+                        return this._postDownloadProcessing(key);
+                    })
+                    .catch(error => {
+                        debug(
+                            `[${key}] error in download promise after resolving on download start: ${
+                                error.message
+                            }`
+                        );
+                    });
+                return dat;
+            }
         } catch (error) {
             try {
                 debug(
@@ -228,7 +244,6 @@ export default class DatManager implements DatManagerInterface {
                     }), attempt to clean up...`
                 );
                 // try to cleanup
-                // await sleep(3000); // for some reason cleaning up too early causes udp crash
                 await this.remove(key);
             } catch (error) {
                 debug(
@@ -425,51 +440,53 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             fs.ensureDirSync(storagePath);
         }
         Dat(storagePath, datOptions, (err: Error, dat: DatArchive) => {
-            if (err) reject(err);
-            else {
-                dat.trackStats();
-                dat.getPath = () => storagePath;
-                dat.getStats = (): DatStats => {
-                    const stats = dat.stats.get();
-                    let downloadPercent = stats.downloaded / stats.length;
-                    if (dat.archive.writable) downloadPercent = 1.0;
-                    // slight hack, but if this is an in-memory dat we override the complete
-                    // state (specifically for the download process, since we initialize a disk version
-                    // after in-memory dl is complete)
-                    return {
-                        key: dat.key.toString("hex"),
-                        writer: dat.writable,
-                        version: dat.archive.version || stats.version,
-                        files: stats.files,
-                        blocksDownlaoded: dat.writable
-                            ? stats.length
-                            : stats.downloaded,
-                        blocksLength: stats.length,
-                        byteLength: stats.byteLength,
-                        progress: downloadPercent,
-                        complete: downloadPercent === 1 && storagePath !== ram,
-                        network: {
-                            connected: dat.connected,
-                            downloadSpeed: dat.stats.network.downloadSpeed,
-                            uploadSpeed: dat.stats.network.uploadSpeed,
-                            downloadTotal: dat.stats.network.downloadTotal,
-                            uploadTotal: dat.stats.network.uploadTotal
-                        },
-                        peers: {
-                            total: dat.stats.peers.total,
-                            complete: dat.stats.peers.complete
-                        }
-                    };
+            if (err) return reject(err);
+            if (!dat) return reject(new Error(`No dat instance returned`));
+            dat.trackStats();
+            dat.getPath = () => storagePath;
+            dat.getStats = (): DatStats => {
+                const stats = dat.stats.get();
+                let downloadPercent = stats.downloaded / stats.length;
+                if (dat.archive.writable) downloadPercent = 1.0;
+                // slight hack, but if this is an in-memory dat we override the complete
+                // state (specifically for the download process, since we initialize a disk version
+                // after in-memory dl is complete)
+                return {
+                    key: dat.key.toString("hex"),
+                    writer: dat.writable,
+                    version: dat.archive.version || stats.version,
+                    files: stats.files,
+                    blocksDownlaoded: dat.writable
+                        ? stats.length
+                        : stats.downloaded,
+                    blocksLength: stats.length,
+                    byteLength: stats.byteLength,
+                    progress: downloadPercent,
+                    complete: downloadPercent === 1 && storagePath !== ram,
+                    network: {
+                        connected: dat.connected,
+                        downloadSpeed: dat.stats.network.downloadSpeed,
+                        uploadSpeed: dat.stats.network.uploadSpeed,
+                        downloadTotal: dat.stats.network.downloadTotal,
+                        uploadTotal: dat.stats.network.uploadTotal
+                    },
+                    peers: {
+                        total: dat.stats.peers.total,
+                        complete: dat.stats.peers.complete
+                    }
                 };
-                dat.getProgress = () => {
-                    const stats = dat.stats.get();
-                    let downloadPercent = stats.downloaded / stats.length;
-                    if (dat.archive.writable) downloadPercent = 1.0;
-                    if (!Number.isFinite(downloadPercent)) downloadPercent = 0;
-                    return downloadPercent;
-                };
-                resolve(dat);
-            }
+            };
+            dat.getProgress = () => {
+                const stats = dat.stats.get();
+                let downloadPercent = stats.downloaded / stats.length;
+                if (dat.archive.writable) downloadPercent = 1.0;
+                if (!Number.isFinite(downloadPercent)) downloadPercent = 0;
+                return downloadPercent;
+            };
+            dat.archive.ready(error => {
+                if (error) reject(error);
+                else resolve(dat);
+            });
         });
     });
 }
@@ -477,7 +494,6 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
 async function closeDat(dat: DatArchive): Promise<any> {
     return new Promise((resolve, reject) => {
         if (!dat || !dat.close) return resolve();
-        debug(util.inspect(dat, false, 3, true));
         dat.close(resolve);
     });
 }
@@ -534,11 +550,9 @@ async function ensurePeerConnected(
 ): Promise<any> {
     return checkExit(timeout);
     async function checkExit(timeout: number): Promise<any> {
-        console.log(`checkExit with timeout: ${timeout}`);
         if (timeout <= 0)
             return Promise.reject(new Error(`Peer connection timeout`));
         if (network.connected) {
-            console.log(`network.connected = true`);
             return Promise.resolve();
         }
         if (network.connecting) {
@@ -556,10 +570,4 @@ async function sleep(ms: number): Promise<any> {
     return new Promise(resolve => {
         setTimeout(resolve, ms);
     });
-}
-
-function timeoutPromise(ms, rejection): NodeJS.Timeout {
-    return setTimeout(() => {
-        rejection(new Error(`promise timed out`));
-    }, ms);
 }
