@@ -393,7 +393,7 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                         byteLength: stats.byteLength,
                         progress: downloadPercent,
                         network: {
-                            connected: dat.network.connected,
+                            connected: dat.connected,
                             downloadSpeed: dat.stats.network.downloadSpeed,
                             uploadSpeed: dat.stats.network.uploadSpeed,
                             downloadTotal: dat.stats.network.downloadTotal,
