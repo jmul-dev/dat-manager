@@ -162,13 +162,13 @@ export default class DatManager implements DatManagerInterface {
                 };
 
                 // Start timeout early
-                timeoutPromise(this.DOWNLOAD_PROGRESS_TIMEOUT, reject);
+                timeoutId = timeoutPromise(
+                    this.DOWNLOAD_PROGRESS_TIMEOUT,
+                    reject
+                );
 
                 network.once("connection", () => {
                     debug(`[${key}] connection made`);
-                });
-                dat.archive.on("ready", () => {
-                    debug(`[${key}] archive ready`);
                 });
                 dat.archive.on("error", error => {
                     debug(`[${key}] archive error: ${error.message}`);
