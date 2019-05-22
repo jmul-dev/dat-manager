@@ -148,8 +148,12 @@ export default class DatManager implements DatManagerInterface {
                 const reject = err => {
                     if (responded) return;
                     responded = true;
-                    if (progress && typeof progress.destroy === "function")
+                    if (progress && typeof progress.destroy === "function") {
+                        debug(
+                            `[${key}] attempting to destroy mirror-folder instance...`
+                        );
                         progress.destroy();
+                    }
                     _reject(err);
                 };
                 const resolve = (data?) => {
@@ -161,6 +165,7 @@ export default class DatManager implements DatManagerInterface {
                 const onProgressUpdate = () => {
                     clearTimeout(timeoutId);
                     if (dat.getProgress() > 0 && opts.resolveOnStart === true) {
+                        debug(`[${key}] resolveOnStart`);
                         resolve();
                     } else {
                         timeoutId = timeoutPromise(
@@ -182,7 +187,12 @@ export default class DatManager implements DatManagerInterface {
                 dat.archive.metadata.update(() => {
                     debug(`[${key}] metadata update`);
                     // race condition, if we hit timeout before this callback do not proceed!
-                    if (responded) return;
+                    if (responded) {
+                        debug(
+                            `[${key}] metadata update triggered after we already responded...`
+                        );
+                        return;
+                    }
                     progress = mirror(
                         { fs: dat.archive, name: "/" },
                         downloadPath,
@@ -265,7 +275,7 @@ export default class DatManager implements DatManagerInterface {
             // Join network with the disk dat
             debug(`[${key}] joining network...`);
             await joinNetwork(diskDat);
-            debug(`[${key}] succesffuly downloaded and joined network!`);
+            debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
             try {
