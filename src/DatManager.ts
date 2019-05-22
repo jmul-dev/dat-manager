@@ -176,6 +176,8 @@ export default class DatManager implements DatManagerInterface {
                 });
                 dat.archive.metadata.update(() => {
                     debug(`[${key}] metadata update`);
+                    // race condition, if we hit timeout before this callback do not proceed!
+                    if (responded) return;
                     progress = mirror(
                         { fs: dat.archive, name: "/" },
                         downloadPath,
@@ -192,6 +194,8 @@ export default class DatManager implements DatManagerInterface {
                     );
                     progress.on("put-data", onProgressUpdate);
                     progress.on("error", reject);
+                    // reset timeout
+                    onProgressUpdate();
                 });
 
                 const onProgressUpdate = () => {
