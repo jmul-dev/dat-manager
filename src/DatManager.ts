@@ -3,7 +3,6 @@ import DatManagerInterface, {
     DatManagerOptions
 } from "./DatManagerInterface";
 import fs from "fs-extra";
-import util from "util";
 import path, { resolve, join } from "path";
 import Dat from "dat-node";
 import Debug from "debug";
@@ -381,13 +380,13 @@ export default class DatManager implements DatManagerInterface {
      */
     async remove(key: string) {
         debug(`[${key}] removing...`);
-        const dat: DatArchive = this._dats[key];
+        let dat: DatArchive = this._dats[key];
         // 1. If we have dat instance, close it up
         if (dat) {
             debug(`[${key}] closing dat instance...`);
             await closeDat(dat);
             debug(`[${key}] dat instance closed`);
-            this._dats[key] = null;
+            delete this._dats[key];
         }
         // 2. Remove from persisted storage
         debug(`[${key}] removing from db...`);
@@ -403,6 +402,7 @@ export default class DatManager implements DatManagerInterface {
             ); /* For some reason dat close may hang on to fd longer than it should */
             await fs.remove(datDir);
         }
+        dat = null;
         debug(`[${key}] succesfully removed!`);
     }
 

@@ -1,4 +1,5 @@
 import "mocha";
+import { describe, before, after, it } from "mocha";
 import path from "path";
 import DatManager from "./index";
 import fs from "fs-extra";
@@ -90,7 +91,7 @@ describe("DatManager Test Suite", () => {
 
         it("should fail to download unavailable dat", async function() {
             this.timeout(16000);
-            this.skip();
+            // this.skip();
             try {
                 await dat.download(unreachableDat);
             } catch (error) {
@@ -98,6 +99,48 @@ describe("DatManager Test Suite", () => {
                 return;
             }
             throw new Error(`Download should have failed`);
+        });
+
+        // it("should wait awhile", async function() {
+        //     this.timeout(22000);
+        //     await new Promise(resolve => {
+        //         setTimeout(resolve, 20000);
+        //     });
+        // });
+
+        it("should handle multiple dat downloads without crashing", function(done) {
+            this.timeout(16000);
+            this.skip();
+            const downloadPromise = (key, delay = 0) => {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        dat.download(key)
+                            .then(resolve)
+                            .catch(resolve);
+                    }, delay);
+                });
+            };
+            Promise.all([
+                downloadPromise(
+                    "778f8d955175c92e4ced5e4f5563f69bfec0c86cc6f670352c457943666fe638",
+                    100
+                ),
+                downloadPromise(
+                    "778f8d955175c92e4ced5e4f5563f69bfec0c86cc6f670352c457943666fe637",
+                    200
+                ),
+                downloadPromise(
+                    "778f8d955175c92e4ced5e4f5563f69bfec0c86cc6f670352c457943666fe636",
+                    350
+                )
+            ]).then(results => {
+                for (let i = 0; i < results.length; i++) {
+                    const result = results[i];
+                    if (!(result instanceof Error))
+                        return done(new Error(`Downloads should have failed`));
+                }
+                done();
+            });
         });
 
         it("should resolveOnStart and complete known dat", async function() {
