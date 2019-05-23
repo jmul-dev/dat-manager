@@ -515,7 +515,8 @@ async function joinNetwork(
                 dht: false,
                 hash: false,
                 utp: true,
-                tcp: true
+                tcp: true,
+                port: "0" // Force a random open port!
             },
             error => {
                 if (error) return reject(error);
@@ -525,7 +526,8 @@ async function joinNetwork(
                 }
             }
         );
-        network.on("listening", () => {
+        network.on("listening", port => {
+            debug(`[${dat.key.toString("hex")}] network port: ${port}`);
             if (!resolveOnNetworkCallback) {
                 dat.connected = true;
                 resolve(network);
