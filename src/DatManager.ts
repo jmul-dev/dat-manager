@@ -107,6 +107,7 @@ export default class DatManager implements DatManagerInterface {
         const datDir = path.join(this.datStoragePath, key);
         const datDirExists = await fs.pathExists(datDir);
         if (!datDirExists) throw new Error(`Dat not found in storage`);
+        debug(`[${key}] get dat but path does not exist, running createDat`);
         const dat: DatArchive = await createDat(datDir, {
             key,
             ...this.datStorageOptions
@@ -354,6 +355,8 @@ export default class DatManager implements DatManagerInterface {
         const dat: DatArchive = await this.get(key);
         if (!dat.writable)
             throw new Error(`Cannot import files on a non-writable dat`);
+        if (srcPath && !(await fs.pathExists(srcPath)))
+            throw new Error(`Cannot import files, src path does not exist`);
         await new Promise((resolve, reject) => {
             let filesImported = 0;
             const progress = dat.importFiles(
@@ -368,6 +371,10 @@ export default class DatManager implements DatManagerInterface {
             progress.on("put", (src, dest) => {
                 filesImported++;
                 debug(`[${key}] imported file: ${dest.name}`);
+            });
+            progress.on("error", error => {
+                debug(`[${key}] error importing: ${error.message}`);
+                reject(error);
             });
         });
         debug(`[${key}] import success`);
