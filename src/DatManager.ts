@@ -514,7 +514,7 @@ async function joinNetwork(
             {
                 dht: false,
                 hash: false,
-                utp: true,
+                utp: false,
                 tcp: true,
                 port: "0" // Force a random open port!
             },
