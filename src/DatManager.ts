@@ -460,10 +460,10 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                 // after in-memory dl is complete)
                 return {
                     key: dat.key.toString("hex"),
-                    writer: dat.writable,
+                    writer: dat.archive.writable,
                     version: dat.archive.version || stats.version,
                     files: stats.files,
-                    blocksDownlaoded: dat.writable
+                    blocksDownlaoded: dat.archive.writable
                         ? stats.length
                         : stats.downloaded,
                     blocksLength: stats.length,
