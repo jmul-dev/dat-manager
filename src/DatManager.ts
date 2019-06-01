@@ -21,7 +21,7 @@ interface DatDbEntry {
 }
 
 export default class DatManager implements DatManagerInterface {
-    public DOWNLOAD_PROGRESS_TIMEOUT = 12000;
+    public DOWNLOAD_PROGRESS_TIMEOUT = 120000;
     private datStoragePath;
     // see dat-storage package
     private datStorageOptions: {
@@ -519,17 +519,14 @@ async function joinNetwork(
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork(
             {
-                dht: false,
-                hash: false,
-                utp: false,
-                tcp: true,
-                port: "0" // Force a random open port!
+                utp: true,
+                tcp: true
             },
             error => {
                 if (error) return reject(error);
                 if (resolveOnNetworkCallback) {
                     dat.connected = true;
-                    resolve(network);
+                    resolve(dat.network);
                 }
             }
         );
@@ -537,7 +534,7 @@ async function joinNetwork(
             debug(`[${dat.key.toString("hex")}] network port: ${port}`);
             if (!resolveOnNetworkCallback) {
                 dat.connected = true;
-                resolve(network);
+                resolve(dat.network);
             }
         });
         network.on("error", error => {
