@@ -22,6 +22,9 @@ interface DatDbEntry {
 
 export default class DatManager implements DatManagerInterface {
     public DOWNLOAD_PROGRESS_TIMEOUT = 120000;
+	public INBOUND_PORT_START = 30000;
+	private lastUsedInboundPort = this.INBOUND_PORT_START;
+
     private datStoragePath;
     // see dat-storage package
     private datStorageOptions: {
@@ -144,7 +147,7 @@ export default class DatManager implements DatManagerInterface {
             this._dats[key] = dat;
             debug(`[${key}] ram dat initialized`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
-            const network = await joinNetwork(dat, true);
+			const { network } = await joinNetwork(dat, true);
             debug(`[${key}] network joined, ensuring peer connection...`);
             await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
             debug(`[${key}] peer connection(s) has been made`);
@@ -291,7 +294,8 @@ export default class DatManager implements DatManagerInterface {
             }
             // Join network with the disk dat
             debug(`[${key}] joining network...`);
-            await joinNetwork(diskDat);
+			const { lastUsedInboundPort } = await joinNetwork(diskDat, false, this.lastUsedInboundPort);
+			this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
@@ -337,7 +341,8 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
         debug(`[${key}] files imported, joining network...`);
-        await joinNetwork(dat);
+		const { lastUsedInboundPort } = await joinNetwork(dat, false, this.lastUsedInboundPort);
+		this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
         debug(`[${key}] dat created and stored!`);
@@ -511,33 +516,37 @@ async function closeDat(dat: DatArchive): Promise<any> {
  *
  * @param dat
  * @param resolveOnNetworkCallback
+ * @param port
  */
 async function joinNetwork(
     dat: DatArchive,
-    resolveOnNetworkCallback: boolean = false
+	resolveOnNetworkCallback: boolean = false,
+	port: number = 0
 ): Promise<any> {
+	const INBOUND_PORT_END = 50000;
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork(
             {
                 utp: true,
-                tcp: true
+				tcp: true,
+				port
             },
             error => {
                 if (error) return reject(error);
                 if (resolveOnNetworkCallback) {
                     dat.connected = true;
-                    resolve(dat.network);
+					resolve({network: dat.network, lastUsedInboundPort: port});
                 }
             }
         );
-        network.on("listening", port => {
-            debug(`[${dat.key.toString("hex")}] network port: ${port}`);
+        network.on("connection", (connection, info) => {
+            debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
             if (!resolveOnNetworkCallback) {
                 dat.connected = true;
-                resolve(dat.network);
+				resolve({network: dat.network, lastUsedInboundPort: port});
             }
         });
-        network.on("error", error => {
+        network.on("error", async (error) => {
             if (error.code !== "EADDRINUSE") {
                 debug(
                     `[${dat.key.toString("hex")}] network error: ${
@@ -545,7 +554,25 @@ async function joinNetwork(
                     }`
                 );
                 reject(error);
-            }
+			} else {
+				if (port) {
+					if (port+1 <= INBOUND_PORT_END) {
+						await joinNetwork(dat, resolveOnNetworkCallback, port+1);
+					} else {
+						debug(
+							`[${dat.key.toString("hex")}] network error: Exceed INBOUND_PORT_END`
+						);
+						reject(error);
+					}
+				} else {
+					debug(
+						`[${dat.key.toString("hex")}] network error: ${
+							error.message
+						}`
+					);
+					reject(error);
+				}
+			}
         });
     });
 }
