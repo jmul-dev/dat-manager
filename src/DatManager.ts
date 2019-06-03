@@ -294,7 +294,9 @@ export default class DatManager implements DatManagerInterface {
             }
             // Join network with the disk dat
             debug(`[${key}] joining network...`);
-			const { lastUsedInboundPort } = await joinNetwork(diskDat, false, this.lastUsedInboundPort);
+			const { network, lastUsedInboundPort } = await joinNetwork(diskDat, true, this.lastUsedInboundPort);
+            await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
+            debug(`[${key}] peer connection(s) has been made`);
 			this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
@@ -341,7 +343,7 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
         debug(`[${key}] files imported, joining network...`);
-		const { lastUsedInboundPort } = await joinNetwork(dat, false, this.lastUsedInboundPort);
+		const { lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
 		this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
