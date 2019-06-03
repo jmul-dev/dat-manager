@@ -527,7 +527,7 @@ async function joinNetwork(
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork(
             {
-                utp: true,
+                utp: false,
 				tcp: true,
 				port
             },
