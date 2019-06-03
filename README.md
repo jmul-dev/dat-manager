@@ -5,10 +5,10 @@
 Need to install `ts-node` globally to run these commands.
 
 List all available commands:
-`ts-node index.ts`
+`ts-node src/bin.ts`
 
 General format:
-`ts-node index.ts [command] [args]`
+`ts-node src/bin.ts [command] [args]`
 
 # Notes
 
