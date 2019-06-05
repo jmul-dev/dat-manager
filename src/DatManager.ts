@@ -145,12 +145,14 @@ export default class DatManager implements DatManagerInterface {
                 ...this.datStorageOptions
             });
             this._dats[key] = dat;
-            debug(`[${key}] ram dat initialized`);
+            debug(`[${key}] ram dat initialized -- TESTING!`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
-			const { network } = await joinNetwork(dat, true);
+			const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
             debug(`[${key}] network joined, ensuring peer connection...`);
             await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
             debug(`[${key}] peer connection(s) has been made`);
+			this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
+
             // 3. Wait for initial metadata sync if not the owner
             if (!dat.archive.writable && !dat.archive.metadata.length) {
                 debug(
@@ -295,6 +297,7 @@ export default class DatManager implements DatManagerInterface {
             // Join network with the disk dat
             debug(`[${key}] joining network...`);
 			const { network, lastUsedInboundPort } = await joinNetwork(diskDat, true, this.lastUsedInboundPort);
+            debug(`[${key}] network joined, ensuring peer connection...`);
             await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
             debug(`[${key}] peer connection(s) has been made`);
 			this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
