@@ -146,7 +146,7 @@ export default class DatManager implements DatManagerInterface {
                 ...this.datStorageOptions
             });
             this._dats[key] = dat;
-            debug(`[${key}] ram dat initialized -- TESTING!`);
+            debug(`[${key}] ram dat initialized`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
 			const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
             debug(`[${key}] network joined, ensuring peer connection...`);
