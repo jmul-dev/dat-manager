@@ -22,7 +22,7 @@ interface DatDbEntry {
 
 export default class DatManager implements DatManagerInterface {
     public DOWNLOAD_PROGRESS_TIMEOUT = 120000;
-	public INBOUND_PORT_START = 30000;
+	public INBOUND_PORT_START = 10000;
 	private lastUsedInboundPort = this.INBOUND_PORT_START;
 
     private datStoragePath;
@@ -90,7 +90,8 @@ export default class DatManager implements DatManagerInterface {
                     key,
                     ...this.datStorageOptions
                 });
-                await joinNetwork(dat);
+				const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
+				this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
             } catch (error) {
@@ -528,7 +529,7 @@ async function joinNetwork(
 	resolveOnNetworkCallback: boolean = false,
 	port: number = 0
 ): Promise<any> {
-	const INBOUND_PORT_END = 50000;
+	const INBOUND_PORT_END = 60000;
     return new Promise((resolve, reject) => {
         const network = dat.joinNetwork(
             {
