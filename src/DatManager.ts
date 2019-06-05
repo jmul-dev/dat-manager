@@ -93,6 +93,7 @@ export default class DatManager implements DatManagerInterface {
 				const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
 				this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
                 this._dats[key] = dat;
+				debug(`entry key ${key}, create dat key ${dat.key}`);
                 debug(`[${key}] resumed dat`);
             } catch (error) {
                 if (dat) await closeDat(dat);
