@@ -290,18 +290,14 @@ export default class DatManager implements DatManagerInterface {
             });
             this._dats[key] = diskDat;
             // Close in memory dat
-            debug(`[${key}] closing ram dat`);
+            debug(`[${key}] closing ram dat and re-spawn`);
             try {
                 await closeDat(dat);
             } catch (error) {
                 debug(`[${key}] error closing ram dat: ${error.message}`);
             }
             // Join network with the disk dat
-            debug(`[${key}] joining network...`);
 			const network = await this._joinNetwork(diskDat, true);
-            debug(`[${key}] network joined, ensuring peer connection...`);
-            await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
-            debug(`[${key}] peer connection(s) has been made`);
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
@@ -346,7 +342,7 @@ export default class DatManager implements DatManagerInterface {
         this._dats[key] = dat;
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
-        debug(`[${key}] files imported, joining network...`);
+        debug(`[${key}] files imported`);
 		await this._joinNetwork(dat, true);
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
