@@ -93,7 +93,6 @@ export default class DatManager implements DatManagerInterface {
 				const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
 				this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
                 this._dats[key] = dat;
-				debug(`entry key ${key}, create dat key ${dat.key.toString("hex")}`);
                 debug(`[${key}] resumed dat`);
             } catch (error) {
                 if (dat) await closeDat(dat);
@@ -532,14 +531,18 @@ async function joinNetwork(
 ): Promise<any> {
 	const INBOUND_PORT_END = 60000;
     return new Promise((resolve, reject) => {
+		debug(`[${dat.key.toString("hex")}] joining network: port ${port}`);
         const network = dat.joinNetwork(
             {
                 utp: false,
 				tcp: true,
 				port
             },
-            error => {
-                if (error) return reject(error);
+            async (error) => {
+				if (error) {
+                    await closeDat(dat);
+					return reject(error);
+				}
                 if (resolveOnNetworkCallback) {
                     dat.connected = true;
 					resolve({network: dat.network, lastUsedInboundPort: port});
@@ -547,7 +550,7 @@ async function joinNetwork(
             }
         );
         network.on("connection", (connection, info) => {
-            debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
+			//debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
             if (!resolveOnNetworkCallback) {
                 dat.connected = true;
 				resolve({network: dat.network, lastUsedInboundPort: port});
@@ -560,6 +563,7 @@ async function joinNetwork(
                         error.message
                     }`
                 );
+				await closeDat(dat);
                 reject(error);
 			} else {
 				if (port) {
@@ -569,6 +573,7 @@ async function joinNetwork(
 						debug(
 							`[${dat.key.toString("hex")}] network error: Exceed INBOUND_PORT_END`
 						);
+						await closeDat(dat);
 						reject(error);
 					}
 				} else {
@@ -577,6 +582,7 @@ async function joinNetwork(
 							error.message
 						}`
 					);
+                    await closeDat(dat);
 					reject(error);
 				}
 			}
