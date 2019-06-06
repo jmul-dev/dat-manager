@@ -23,7 +23,10 @@ interface DatDbEntry {
 export default class DatManager implements DatManagerInterface {
     public DOWNLOAD_PROGRESS_TIMEOUT = 120000;
 	public INBOUND_PORT_START = 10000;
+	public INBOUND_PORT_END = 60000;
+
 	private lastUsedInboundPort = this.INBOUND_PORT_START;
+	private portsInUse = [];
 
     private datStoragePath;
     // see dat-storage package
@@ -90,8 +93,7 @@ export default class DatManager implements DatManagerInterface {
                     key,
                     ...this.datStorageOptions
                 });
-				const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
-				this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
+				const network = await this._joinNetwork(dat, true);
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
             } catch (error) {
@@ -148,11 +150,10 @@ export default class DatManager implements DatManagerInterface {
             this._dats[key] = dat;
             debug(`[${key}] ram dat initialized`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
-			const { network, lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
+			const network = await this._joinNetwork(dat, true);
             debug(`[${key}] network joined, ensuring peer connection...`);
             await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
             debug(`[${key}] peer connection(s) has been made`);
-			this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
 
             // 3. Wait for initial metadata sync if not the owner
             if (!dat.archive.writable && !dat.archive.metadata.length) {
@@ -297,11 +298,10 @@ export default class DatManager implements DatManagerInterface {
             }
             // Join network with the disk dat
             debug(`[${key}] joining network...`);
-			const { network, lastUsedInboundPort } = await joinNetwork(diskDat, true, this.lastUsedInboundPort);
+			const network = await this._joinNetwork(diskDat, true);
             debug(`[${key}] network joined, ensuring peer connection...`);
             await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
             debug(`[${key}] peer connection(s) has been made`);
-			this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
@@ -347,8 +347,7 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
         debug(`[${key}] files imported, joining network...`);
-		const { lastUsedInboundPort } = await joinNetwork(dat, true, this.lastUsedInboundPort);
-		this.lastUsedInboundPort = lastUsedInboundPort || this.INBOUND_PORT_START;
+		await this._joinNetwork(dat, true);
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
         debug(`[${key}] dat created and stored!`);
@@ -449,6 +448,74 @@ export default class DatManager implements DatManagerInterface {
             resolve();
         });
     }
+
+	/**
+	 * Note that joinNetwork callback is not called until the first round of discovery is complete.
+	 * This is mostly useful for downloading/cloning a dat and not so much while sharing a local dat.
+	 *
+	 * @param dat
+	 * @param resolveOnNetworkCallback
+	 */
+	private async _joinNetwork(
+		dat: DatArchive,
+		resolveOnNetworkCallback: boolean = false
+	): Promise<any> {
+		return new Promise(async (resolve, reject) => {
+			let port = this.lastUsedInboundPort;
+			while(this.portsInUse.indexOf(port) !== -1) {
+				port++;
+				if (port === this.INBOUND_PORT_END) {
+					const error = `Exceed INBOUND_PORT_END (${this.INBOUND_PORT_END})`;
+					debug(
+						`[${dat.key.toString("hex")}] network error: ${error}`
+					);
+					await closeDat(dat);
+					reject(error);
+				}
+			}
+			this.lastUsedInboundPort = port;
+			this.portsInUse.push(port);
+
+			debug(`[${dat.key.toString("hex")}] joining network: port ${port}`);
+			const network = dat.joinNetwork(
+				{
+					utp: false,
+					tcp: true,
+					port
+				},
+				async (error) => {
+					if (error) {
+						await closeDat(dat);
+						return reject(error);
+					}
+					if (resolveOnNetworkCallback) {
+						dat.connected = true;
+						resolve(dat.network);
+					}
+				}
+			);
+			network.on("connection", (connection, info) => {
+				//debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
+				if (!resolveOnNetworkCallback) {
+					dat.connected = true;
+					resolve(dat.network);
+				}
+			});
+			network.on("error", async (error) => {
+				if (error.code === "EADDRINUSE") {
+					await this._joinNetwork(dat, resolveOnNetworkCallback);
+				} else {
+					debug(
+						`[${dat.key.toString("hex")}] network error: ${
+							error.message
+						}`
+					);
+					await closeDat(dat);
+					reject(error);
+				}
+			});
+		});
+	}
 }
 
 function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
@@ -513,80 +580,6 @@ async function closeDat(dat: DatArchive): Promise<any> {
     return new Promise((resolve, reject) => {
         if (!dat || !dat.close) return resolve();
         dat.close(resolve);
-    });
-}
-
-/**
- * Note that joinNetwork callback is not called until the first round of discovery is complete.
- * This is mostly useful for downloading/cloning a dat and not so much while sharing a local dat.
- *
- * @param dat
- * @param resolveOnNetworkCallback
- * @param port
- */
-async function joinNetwork(
-    dat: DatArchive,
-	resolveOnNetworkCallback: boolean = false,
-	port: number = 0
-): Promise<any> {
-	const INBOUND_PORT_END = 60000;
-    return new Promise((resolve, reject) => {
-		debug(`[${dat.key.toString("hex")}] joining network: port ${port}`);
-        const network = dat.joinNetwork(
-            {
-                utp: false,
-				tcp: true,
-				port
-            },
-            async (error) => {
-				if (error) {
-                    await closeDat(dat);
-					return reject(error);
-				}
-                if (resolveOnNetworkCallback) {
-                    dat.connected = true;
-					resolve({network: dat.network, lastUsedInboundPort: port});
-                }
-            }
-        );
-        network.on("connection", (connection, info) => {
-			//debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
-            if (!resolveOnNetworkCallback) {
-                dat.connected = true;
-				resolve({network: dat.network, lastUsedInboundPort: port});
-            }
-        });
-        network.on("error", async (error) => {
-            if (error.code !== "EADDRINUSE") {
-                debug(
-                    `[${dat.key.toString("hex")}] network error: ${
-                        error.message
-                    }`
-                );
-				await closeDat(dat);
-                reject(error);
-			} else {
-				if (port) {
-					if (port+1 <= INBOUND_PORT_END) {
-						await joinNetwork(dat, resolveOnNetworkCallback, port+1);
-					} else {
-						debug(
-							`[${dat.key.toString("hex")}] network error: Exceed INBOUND_PORT_END`
-						);
-						await closeDat(dat);
-						reject(error);
-					}
-				} else {
-					debug(
-						`[${dat.key.toString("hex")}] network error: ${
-							error.message
-						}`
-					);
-                    await closeDat(dat);
-					reject(error);
-				}
-			}
-        });
     });
 }
 
