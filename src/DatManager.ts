@@ -514,7 +514,6 @@ export default class DatManager implements DatManagerInterface {
 				}
 			);
 			network.on("connection", (connection, info) => {
-				//debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
 				if (!resolveOnNetworkCallback) {
 					dat.connected = true;
 					resolve({network: dat.network, port});
@@ -522,6 +521,9 @@ export default class DatManager implements DatManagerInterface {
 			});
 			network.on("error", async (error) => {
 				if (error.code === "EADDRINUSE") {
+					debug(
+						`[${dat.key.toString("hex")}] network error: Port ${port} in use`
+					);
 					await this._joinNetwork(dat, resolveOnNetworkCallback, upload);
 				} else {
 					debug(
