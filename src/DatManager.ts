@@ -477,6 +477,8 @@ export default class DatManager implements DatManagerInterface {
 				{
 					utp: false,
 					tcp: true,
+					upload: true,
+					download: true,
 					port
 				},
 				async (error) => {
