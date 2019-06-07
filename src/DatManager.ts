@@ -21,11 +21,12 @@ interface DatDbEntry {
 }
 
 export default class DatManager implements DatManagerInterface {
-    public DOWNLOAD_PROGRESS_TIMEOUT = 120000;
+    public DOWNLOAD_PROGRESS_TIMEOUT = 20000;
 	public UPLOAD_PORT_START = 10000;
 	public UPLOAD_PORT_END = 40000;
 	public DOWNLOAD_PORT_START = 40001;
 	public DOWNLOAD_PORT_END = 60000;
+	public MAX_ATTEMPT = 10;
 
 	private lastUploadPort = this.UPLOAD_PORT_START;
 	private uploadPortsInUse = [];
@@ -154,9 +155,8 @@ export default class DatManager implements DatManagerInterface {
             debug(`[${key}] ram dat initialized`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
 			const {network, port} = await this._joinNetwork(dat, true, false);
-            debug(`[${key}] network joined, ensuring peer connection...`);
-            await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
-            debug(`[${key}] peer connection(s) has been made`);
+			debug(`[${key}] network joined, ensuring peer connection... attempt #1`);
+			const downloadPort = await this._ensurePeerConnectedRetry(dat, network, port);
 
             // 3. Wait for initial metadata sync if not the owner
             if (!dat.archive.writable && !dat.archive.metadata.length) {
@@ -230,12 +230,12 @@ export default class DatManager implements DatManagerInterface {
                 debug(
                     `[${key}] resolving completed download, handoff to post process`
                 );
-                return await this._postDownloadProcessing(key, port);
+                return await this._postDownloadProcessing(key, downloadPort);
             } else {
                 debug(`[${key}] resolving download on start`);
                 downloadPromise
                     .then(() => {
-                        return this._postDownloadProcessing(key, port);
+                        return this._postDownloadProcessing(key, downloadPort);
                     })
                     .catch(error => {
                         debug(
@@ -461,7 +461,8 @@ export default class DatManager implements DatManagerInterface {
 	private async _joinNetwork(
 		dat: DatArchive,
 		resolveOnNetworkCallback: boolean = false,
-		upload: boolean = true
+		upload: boolean = true,
+		forcePort: number = 0
 	): Promise<any> {
 		return new Promise(async (resolve, reject) => {
 			let port, portsInUse, portEnd;
@@ -470,7 +471,7 @@ export default class DatManager implements DatManagerInterface {
 				portsInUse = this.uploadPortsInUse;
 				portEnd = this.UPLOAD_PORT_END;
 			} else {
-				port = this.DOWNLOAD_PORT_START;
+				port = forcePort ?  forcePort : this.DOWNLOAD_PORT_START;
 				portsInUse = this.downloadPortsInUse;
 				portEnd = this.DOWNLOAD_PORT_END;
 			}
@@ -545,6 +546,43 @@ export default class DatManager implements DatManagerInterface {
 	 */
 	private _freeDownloadPort(port: number) {
 		this.downloadPortsInUse = this.downloadPortsInUse.filter(_port => _port !== port);
+	}
+
+	/**
+	 * After network is joined, want to make sure that there is peer available on the network and
+	 * able to connect. Otherwise, will re-join the network and re-connect with peer again
+	 * for MAX_ATTEMPT of tries.
+	 *
+	 * @param dat
+	 * @param network
+	 * @param port
+	 * @param attempt
+	 */
+	private _ensurePeerConnectedRetry(
+		dat: DatArchive,
+		network,
+		port: number,
+		attempt: number = 1
+	): Promise<any> {
+		return new Promise(async (resolve, reject) => {
+			ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT)
+				.then(() => {
+					debug(`[${dat.key.toString('hex')}] peer connection(s) has been made`);
+					resolve(port);
+				})
+				.catch( async (error) => {
+					debug(`[${dat.key.toString('hex')}] unable to connect to peer`);
+					if (attempt === this.MAX_ATTEMPT) return reject(error);
+					await sleep(1000);
+					const {network: _network, port: _port} = await this._joinNetwork(dat, true, false, port+1);
+					this._freeDownloadPort(port);
+					attempt++;
+					debug(`[${dat.key.toString('hex')}] network joined, ensuring peer connection... attempt #${attempt}`);
+					this._ensurePeerConnectedRetry(dat, _network, _port, attempt)
+						.then(resolve)
+						.catch(reject);
+				});
+		});
 	}
 }
 
