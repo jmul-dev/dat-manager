@@ -22,11 +22,14 @@ interface DatDbEntry {
 
 export default class DatManager implements DatManagerInterface {
     public DOWNLOAD_PROGRESS_TIMEOUT = 120000;
-	public INBOUND_PORT_START = 10000;
-	public INBOUND_PORT_END = 60000;
+	public UPLOAD_PORT_START = 10000;
+	public UPLOAD_PORT_END = 40000;
+	public DOWNLOAD_PORT_START = 40001;
+	public DOWNLOAD_PORT_END = 60000;
 
-	private lastUsedInboundPort = this.INBOUND_PORT_START;
-	private portsInUse = [];
+	private lastUploadPort = this.UPLOAD_PORT_START;
+	private uploadPortsInUse = [];
+	private downloadPortsInUse = [];
 
     private datStoragePath;
     // see dat-storage package
@@ -93,7 +96,7 @@ export default class DatManager implements DatManagerInterface {
                     key,
                     ...this.datStorageOptions
                 });
-				const network = await this._joinNetwork(dat, true);
+				await this._joinNetwork(dat, true, true);
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
             } catch (error) {
@@ -150,7 +153,7 @@ export default class DatManager implements DatManagerInterface {
             this._dats[key] = dat;
             debug(`[${key}] ram dat initialized`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
-			const network = await this._joinNetwork(dat, true);
+			const {network, port} = await this._joinNetwork(dat, true, false);
             debug(`[${key}] network joined, ensuring peer connection...`);
             await ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT);
             debug(`[${key}] peer connection(s) has been made`);
@@ -227,12 +230,12 @@ export default class DatManager implements DatManagerInterface {
                 debug(
                     `[${key}] resolving completed download, handoff to post process`
                 );
-                return await this._postDownloadProcessing(key);
+                return await this._postDownloadProcessing(key, port);
             } else {
                 debug(`[${key}] resolving download on start`);
                 downloadPromise
                     .then(() => {
-                        return this._postDownloadProcessing(key);
+                        return this._postDownloadProcessing(key, port);
                     })
                     .catch(error => {
                         debug(
@@ -269,8 +272,9 @@ export default class DatManager implements DatManagerInterface {
      * instantiate the dat post-download to store in db, create .dat folder, etc..
      *
      * @param key
+	 * @param downloadPort
      */
-    private async _postDownloadProcessing(key) {
+    private async _postDownloadProcessing(key, downloadPort) {
         const dat = this._dats[key];
         if (!dat) throw new Error(`Cannot post-process non-existent dat`);
         try {
@@ -293,11 +297,12 @@ export default class DatManager implements DatManagerInterface {
             debug(`[${key}] closing ram dat and re-spawn`);
             try {
                 await closeDat(dat);
+				this._freeDownloadPort(downloadPort);
             } catch (error) {
                 debug(`[${key}] error closing ram dat: ${error.message}`);
             }
             // Join network with the disk dat
-			const network = await this._joinNetwork(diskDat, true);
+			await this._joinNetwork(diskDat, true, true);
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
@@ -343,7 +348,7 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
         debug(`[${key}] files imported`);
-		await this._joinNetwork(dat, true);
+		await this._joinNetwork(dat, true, true);
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
         debug(`[${key}] dat created and stored!`);
@@ -451,17 +456,28 @@ export default class DatManager implements DatManagerInterface {
 	 *
 	 * @param dat
 	 * @param resolveOnNetworkCallback
+	 * @param upload
 	 */
 	private async _joinNetwork(
 		dat: DatArchive,
-		resolveOnNetworkCallback: boolean = false
+		resolveOnNetworkCallback: boolean = false,
+		upload: boolean = true
 	): Promise<any> {
 		return new Promise(async (resolve, reject) => {
-			let port = this.lastUsedInboundPort;
-			while(this.portsInUse.indexOf(port) !== -1) {
+			let port, portsInUse, portUpperLimit;
+			if (upload) {
+				port = this.lastUploadPort;
+				portsInUse = this.uploadPortsInUse;
+				portEnd = this.UPLOAD_PORT_END;
+			} else {
+				port = this.DOWNLOAD_PORT_START;
+				portsInUse = this.downloadPortsInUse;
+				portEnd = this.DOWNLOAD_PORT_END;
+			}
+			while(portsInUse.indexOf(port) !== -1) {
 				port++;
-				if (port === this.INBOUND_PORT_END) {
-					const error = `Exceed INBOUND_PORT_END (${this.INBOUND_PORT_END})`;
+				if (port === portEnd) {
+					const error = `end port reached (${portEnd})`;
 					debug(
 						`[${dat.key.toString("hex")}] network error: ${error}`
 					);
@@ -469,9 +485,12 @@ export default class DatManager implements DatManagerInterface {
 					reject(error);
 				}
 			}
-			this.lastUsedInboundPort = port;
-			this.portsInUse.push(port);
-
+			if (upload) {
+				this.lastUploadPort = port;
+				this.uploadPortsInUse.push(port);
+			} else {
+				this.downloadPortsInUse.push(port);
+			}
 			debug(`[${dat.key.toString("hex")}] joining network: port ${port}`);
 			const network = dat.joinNetwork(
 				{
@@ -484,11 +503,12 @@ export default class DatManager implements DatManagerInterface {
 				async (error) => {
 					if (error) {
 						await closeDat(dat);
+						this._freeDownloadPort(port);
 						return reject(error);
 					}
 					if (resolveOnNetworkCallback) {
 						dat.connected = true;
-						resolve(dat.network);
+						resolve({network: dat.network, port});
 					}
 				}
 			);
@@ -496,12 +516,13 @@ export default class DatManager implements DatManagerInterface {
 				//debug(`[${dat.key.toString("hex")}] network connected: port ${network.options.port}`);
 				if (!resolveOnNetworkCallback) {
 					dat.connected = true;
-					resolve(dat.network);
+					resolve({network: dat.network, port});
 				}
 			});
 			network.on("error", async (error) => {
 				if (error.code === "EADDRINUSE") {
-					await this._joinNetwork(dat, resolveOnNetworkCallback);
+					this._freeDownloadPort(port);
+					await this._joinNetwork(dat, resolveOnNetworkCallback, upload);
 				} else {
 					debug(
 						`[${dat.key.toString("hex")}] network error: ${
@@ -509,10 +530,21 @@ export default class DatManager implements DatManagerInterface {
 						}`
 					);
 					await closeDat(dat);
+					this._freeDownloadPort(port);
 					reject(error);
 				}
 			});
 		});
+	}
+
+	/**
+	 * Once the download port is no longer in use, remove it from the list
+	 * so that it can be re-used later
+	 *
+	 * @param port
+	 */
+	private _freeDownloadPort(port: number) {
+		this.downloadPortsInUse = this.downloadPortsInUse.filter(_port => _port !== port);
 	}
 }
 
