@@ -464,7 +464,7 @@ export default class DatManager implements DatManagerInterface {
 		upload: boolean = true
 	): Promise<any> {
 		return new Promise(async (resolve, reject) => {
-			let port, portsInUse, portUpperLimit;
+			let port, portsInUse, portEnd;
 			if (upload) {
 				port = this.lastUploadPort;
 				portsInUse = this.uploadPortsInUse;
