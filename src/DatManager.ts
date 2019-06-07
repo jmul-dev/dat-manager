@@ -522,7 +522,6 @@ export default class DatManager implements DatManagerInterface {
 			});
 			network.on("error", async (error) => {
 				if (error.code === "EADDRINUSE") {
-					this._freeDownloadPort(port);
 					await this._joinNetwork(dat, resolveOnNetworkCallback, upload);
 				} else {
 					debug(
