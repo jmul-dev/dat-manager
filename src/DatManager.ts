@@ -577,7 +577,11 @@ export default class DatManager implements DatManagerInterface {
 				})
 				.catch( async (error) => {
 					debug(`[${dat.key.toString('hex')}] unable to connect to peer`);
-					if (attempt === this.MAX_ATTEMPT) return reject(error);
+					if (attempt === this.MAX_ATTEMPT) {
+						network.close();
+						this._freeDownloadPort(port);
+						return reject(error);
+					}
 					await sleep(1000);
 					const {network: _network, port: _port} = await this._joinNetwork(dat, true, false, port+1);
 					network.close();
