@@ -580,6 +580,7 @@ export default class DatManager implements DatManagerInterface {
 					if (attempt === this.MAX_ATTEMPT) return reject(error);
 					await sleep(1000);
 					const {network: _network, port: _port} = await this._joinNetwork(dat, true, false, port+1);
+					network.close();
 					this._freeDownloadPort(port);
 					attempt++;
 					debug(`[${dat.key.toString('hex')}] network joined, ensuring peer connection... attempt #${attempt}`);
