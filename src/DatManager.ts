@@ -97,7 +97,7 @@ export default class DatManager implements DatManagerInterface {
                     key,
                     ...this.datStorageOptions
                 });
-				await this._joinNetwork(dat, true, true);
+				await this._joinNetwork(dat, false, true);
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
             } catch (error) {
@@ -302,7 +302,7 @@ export default class DatManager implements DatManagerInterface {
                 debug(`[${key}] error closing ram dat: ${error.message}`);
             }
             // Join network with the disk dat
-			await this._joinNetwork(diskDat, true, true);
+			await this._joinNetwork(diskDat, false, true);
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
@@ -348,7 +348,7 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
         debug(`[${key}] files imported`);
-		await this._joinNetwork(dat, true, true);
+		await this._joinNetwork(dat, false, true);
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
         debug(`[${key}] dat created and stored!`);
@@ -513,11 +513,15 @@ export default class DatManager implements DatManagerInterface {
 					}
 				}
 			);
-			network.on("connection", (connection, info) => {
+			network.on("listening", () => {
 				if (!resolveOnNetworkCallback) {
 					dat.connected = true;
 					resolve({network: dat.network, port});
 				}
+			});
+			network.on("connection", (connection, info) => {
+				dat.connected = true;
+				resolve({network: dat.network, port});
 			});
 			network.on("error", async (error) => {
 				if (error.code === "EADDRINUSE") {
