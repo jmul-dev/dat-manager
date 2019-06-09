@@ -132,6 +132,7 @@ export default class DatManager implements DatManagerInterface {
     ): Promise<DatArchive> {
         debug(`[${key}] attempting to download...`);
         let dat: DatArchive = this._dats[key];
+		let downloadPort;
         if (dat && dat.getProgress() < 1) {
             throw new Error(
                 `Dat instance already exists, download in progress`
@@ -156,7 +157,7 @@ export default class DatManager implements DatManagerInterface {
             // 2. Join network and esure that we make a succesful connection in a timely manner
 			const {network, port} = await this._joinNetwork(dat, true, false);
 			debug(`[${key}] network joined, ensuring peer connection... attempt #1`);
-			const downloadPort = await this._ensurePeerConnectedRetry(dat, network, port);
+			downloadPort = await this._ensurePeerConnectedRetry(dat, network, port);
 
             // 3. Wait for initial metadata sync if not the owner
             if (!dat.archive.writable && !dat.archive.metadata.length) {
@@ -248,6 +249,7 @@ export default class DatManager implements DatManagerInterface {
             }
         } catch (error) {
             try {
+				this._freeDownloadPort(downloadPort);
                 debug(
                     `[${key}] caught error during download process (${
                         error.message
