@@ -265,6 +265,7 @@ export default class DatManager implements DatManagerInterface {
                 );
                 throw error;
             }
+			throw error;
         }
     }
 
@@ -324,6 +325,7 @@ export default class DatManager implements DatManagerInterface {
                 );
                 throw error;
             }
+			throw error;
         }
     }
 
