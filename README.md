@@ -2,13 +2,17 @@
 
 # Commands
 
-Need to install `ts-node` globally to run these commands.
+Optionally install `ts-node` to run commands on direct src, otherwise build the package (`npm run build`) and run the compiled src under node. Debugging is available via the `DEBUG=ao:dat-manager` env variable.
 
 List all available commands:
-`ts-node src/bin.ts`
+
+-   `ts-node src/bin.ts`
+-   `DEBUG=ao:dat-manager node dist/bin.js`
 
 General format:
-`ts-node src/bin.ts [command] [args]`
+
+-   `ts-node src/bin.ts [command] [args]`
+-   `DEBUG=ao:dat-manager node dist/bin.js [command] [args]`
 
 # Notes
 
