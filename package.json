@@ -5,8 +5,9 @@
     "types": "dist/index.d.ts",
     "license": "MIT",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc && npm run rm-cmd-ts-declerations",
         "test": "mocha --exit --timeout 10000 -r ts-node/register src/**/*.spec.ts",
+        "rm-cmd-ts-declerations": "rimraf dist/cmds/*.d.ts",
         "postinstall": "tsc"
     },
     "devDependencies": {

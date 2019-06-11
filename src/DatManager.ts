@@ -22,15 +22,15 @@ interface DatDbEntry {
 
 export default class DatManager implements DatManagerInterface {
     public DOWNLOAD_PROGRESS_TIMEOUT = 20000;
-	public UPLOAD_PORT_START = 10000;
-	public UPLOAD_PORT_END = 40000;
-	public DOWNLOAD_PORT_START = 40001;
-	public DOWNLOAD_PORT_END = 60000;
-	public MAX_ATTEMPT = 10;
+    public UPLOAD_PORT_START = 10000;
+    public UPLOAD_PORT_END = 40000;
+    public DOWNLOAD_PORT_START = 40001;
+    public DOWNLOAD_PORT_END = 60000;
+    public MAX_ATTEMPT = 10;
 
-	private lastUploadPort = this.UPLOAD_PORT_START;
-	private uploadPortsInUse = [];
-	private downloadPortsInUse = [];
+    private lastUploadPort = this.UPLOAD_PORT_START;
+    private uploadPortsInUse = [];
+    private downloadPortsInUse = [];
 
     private datStoragePath;
     // see dat-storage package
@@ -97,7 +97,7 @@ export default class DatManager implements DatManagerInterface {
                     key,
                     ...this.datStorageOptions
                 });
-				await this._joinNetwork(dat, false, true);
+                await this._joinNetwork(dat, false, true);
                 this._dats[key] = dat;
                 debug(`[${key}] resumed dat`);
             } catch (error) {
@@ -132,7 +132,7 @@ export default class DatManager implements DatManagerInterface {
     ): Promise<DatArchive> {
         debug(`[${key}] attempting to download...`);
         let dat: DatArchive = this._dats[key];
-		let downloadPort;
+        let downloadPort;
         if (dat && dat.getProgress() < 1) {
             throw new Error(
                 `Dat instance already exists, download in progress`
@@ -155,9 +155,15 @@ export default class DatManager implements DatManagerInterface {
             this._dats[key] = dat;
             debug(`[${key}] ram dat initialized`);
             // 2. Join network and esure that we make a succesful connection in a timely manner
-			const {network, port} = await this._joinNetwork(dat, true, false);
-			debug(`[${key}] network joined, ensuring peer connection... attempt #1`);
-			downloadPort = await this._ensurePeerConnectedRetry(dat, network, port);
+            const { network, port } = await this._joinNetwork(dat, true, false);
+            debug(
+                `[${key}] network joined, ensuring peer connection... attempt #1`
+            );
+            downloadPort = await this._ensurePeerConnectedRetry(
+                dat,
+                network,
+                port
+            );
 
             // 3. Wait for initial metadata sync if not the owner
             if (!dat.archive.writable && !dat.archive.metadata.length) {
@@ -199,12 +205,16 @@ export default class DatManager implements DatManagerInterface {
                     dat.stats.removeListener("update", logDownloadStats);
                     _resolve(data);
                 };
+                let lastLogInterval = -1;
                 const logDownloadStats = () => {
-                    debug(
-                        `[${key}] progress: ${(dat.getProgress() * 100).toFixed(
-                            1
-                        )}`
-                    );
+                    // Limit logging to 10% intervals to avoid blowing up the logs
+                    let logPercentage = dat.getProgress() * 100;
+                    let logPercentageInterval =
+                        parseInt(`${logPercentage / 10}`) * 10;
+                    if (logPercentageInterval != lastLogInterval) {
+                        debug(`[${key}] progress: ${logPercentage.toFixed(1)}`);
+                        lastLogInterval = logPercentageInterval;
+                    }
                 };
                 dat.stats.on("update", logDownloadStats);
                 // mirror download to disk
@@ -249,7 +259,7 @@ export default class DatManager implements DatManagerInterface {
             }
         } catch (error) {
             try {
-				this._freeDownloadPort(downloadPort);
+                this._freeDownloadPort(downloadPort);
                 debug(
                     `[${key}] caught error during download process (${
                         error.message
@@ -265,7 +275,7 @@ export default class DatManager implements DatManagerInterface {
                 );
                 throw error;
             }
-			throw error;
+            throw error;
         }
     }
 
@@ -274,7 +284,7 @@ export default class DatManager implements DatManagerInterface {
      * instantiate the dat post-download to store in db, create .dat folder, etc..
      *
      * @param key
-	 * @param downloadPort
+     * @param downloadPort
      */
     private async _postDownloadProcessing(key, downloadPort) {
         const dat = this._dats[key];
@@ -299,12 +309,12 @@ export default class DatManager implements DatManagerInterface {
             debug(`[${key}] closing ram dat and re-spawn`);
             try {
                 await closeDat(dat);
-				this._freeDownloadPort(downloadPort);
+                this._freeDownloadPort(downloadPort);
             } catch (error) {
                 debug(`[${key}] error closing ram dat: ${error.message}`);
             }
             // Join network with the disk dat
-			await this._joinNetwork(diskDat, false, true);
+            await this._joinNetwork(diskDat, false, true);
             debug(`[${key}] succesfuly downloaded and joined network!`);
             return diskDat;
         } catch (error) {
@@ -325,7 +335,7 @@ export default class DatManager implements DatManagerInterface {
                 );
                 throw error;
             }
-			throw error;
+            throw error;
         }
     }
 
@@ -350,7 +360,7 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] dat instance initialized, importing files...`);
         await this.importFiles(key, srcPath);
         debug(`[${key}] files imported`);
-		await this._joinNetwork(dat, false, true);
+        await this._joinNetwork(dat, false, true);
         debug(`[${key}] storing dat in persisted storage...`);
         await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
         debug(`[${key}] dat created and stored!`);
@@ -452,150 +462,176 @@ export default class DatManager implements DatManagerInterface {
         });
     }
 
-	/**
-	 * Note that joinNetwork callback is not called until the first round of discovery is complete.
-	 * This is mostly useful for downloading/cloning a dat and not so much while sharing a local dat.
-	 *
-	 * @param dat
-	 * @param resolveOnNetworkCallback
-	 * @param upload
-	 */
-	private async _joinNetwork(
-		dat: DatArchive,
-		resolveOnNetworkCallback: boolean = false,
-		upload: boolean = true,
-		forcePort: number = 0
-	): Promise<any> {
-		return new Promise(async (resolve, reject) => {
-			let port, portsInUse, portEnd;
-			if (upload) {
-				port = this.lastUploadPort;
-				portsInUse = this.uploadPortsInUse;
-				portEnd = this.UPLOAD_PORT_END;
-			} else {
-				port = forcePort ?  forcePort : this.DOWNLOAD_PORT_START;
-				portsInUse = this.downloadPortsInUse;
-				portEnd = this.DOWNLOAD_PORT_END;
-			}
-			while(portsInUse.indexOf(port) !== -1) {
-				port++;
-				if (port === portEnd) {
-					const error = `end port reached (${portEnd})`;
-					debug(
-						`[${dat.key.toString("hex")}] network error: ${error}`
-					);
-					await closeDat(dat);
-					reject(error);
-				}
-			}
-			if (upload) {
-				this.lastUploadPort = port;
-				this.uploadPortsInUse.push(port);
-			} else {
-				this.downloadPortsInUse.push(port);
-			}
-			debug(`[${dat.key.toString("hex")}] joining network: port ${port}`);
-			const network = dat.joinNetwork(
-				{
-					utp: false,
-					tcp: true,
-					upload: true,
-					download: true,
-					port
-				},
-				async (error) => {
-					if (error) {
-						await closeDat(dat);
-						this._freeDownloadPort(port);
-						return reject(error);
-					}
-					if (resolveOnNetworkCallback) {
-						dat.connected = true;
-						resolve({network: dat.network, port});
-					}
-				}
-			);
-			network.on("listening", () => {
-				if (!resolveOnNetworkCallback) {
-					dat.connected = true;
-					resolve({network: dat.network, port});
-				}
-			});
-			network.on("connection", (connection, info) => {
-				dat.connected = true;
-				resolve({network: dat.network, port});
-			});
-			network.on("error", async (error) => {
-				if (error.code === "EADDRINUSE") {
-					debug(
-						`[${dat.key.toString("hex")}] network error: Port ${port} in use`
-					);
-					await this._joinNetwork(dat, resolveOnNetworkCallback, upload);
-				} else {
-					debug(
-						`[${dat.key.toString("hex")}] network error: ${
-							error.message
-						}`
-					);
-					await closeDat(dat);
-					this._freeDownloadPort(port);
-					reject(error);
-				}
-			});
-		});
-	}
+    /**
+     * Note that joinNetwork callback is not called until the first round of discovery is complete.
+     * This is mostly useful for downloading/cloning a dat and not so much while sharing a local dat.
+     *
+     * @param dat
+     * @param resolveOnNetworkCallback
+     * @param upload
+     */
+    private async _joinNetwork(
+        dat: DatArchive,
+        resolveOnNetworkCallback: boolean = false,
+        upload: boolean = true,
+        forcePort: number = 0
+    ): Promise<any> {
+        return new Promise(async (resolve, reject) => {
+            let port, portsInUse, portEnd;
+            if (upload) {
+                port = this.lastUploadPort;
+                portsInUse = this.uploadPortsInUse;
+                portEnd = this.UPLOAD_PORT_END;
+            } else {
+                port = forcePort ? forcePort : this.DOWNLOAD_PORT_START;
+                portsInUse = this.downloadPortsInUse;
+                portEnd = this.DOWNLOAD_PORT_END;
+            }
+            while (portsInUse.indexOf(port) !== -1) {
+                port++;
+                if (port === portEnd) {
+                    const error = `end port reached (${portEnd})`;
+                    debug(
+                        `[${dat.key.toString("hex")}] network error: ${error}`
+                    );
+                    await closeDat(dat);
+                    reject(error);
+                }
+            }
+            if (upload) {
+                this.lastUploadPort = port;
+                this.uploadPortsInUse.push(port);
+            } else {
+                this.downloadPortsInUse.push(port);
+            }
+            debug(`[${dat.key.toString("hex")}] joining network: port ${port}`);
+            const network = dat.joinNetwork(
+                {
+                    utp: false,
+                    tcp: true,
+                    upload: true,
+                    download: true,
+                    port
+                },
+                async error => {
+                    if (error) {
+                        await closeDat(dat);
+                        this._freeDownloadPort(port);
+                        return reject(error);
+                    }
+                    if (resolveOnNetworkCallback) {
+                        dat.connected = true;
+                        resolve({ network: dat.network, port });
+                    }
+                }
+            );
+            network.on("listening", () => {
+                if (!resolveOnNetworkCallback) {
+                    dat.connected = true;
+                    resolve({ network: dat.network, port });
+                }
+            });
+            network.on("connection", (connection, info) => {
+                dat.connected = true;
+                resolve({ network: dat.network, port });
+            });
+            network.on("error", async error => {
+                if (error.code === "EADDRINUSE") {
+                    debug(
+                        `[${dat.key.toString(
+                            "hex"
+                        )}] network error: Port ${port} in use`
+                    );
+                    await this._joinNetwork(
+                        dat,
+                        resolveOnNetworkCallback,
+                        upload
+                    );
+                } else {
+                    debug(
+                        `[${dat.key.toString("hex")}] network error: ${
+                            error.message
+                        }`
+                    );
+                    await closeDat(dat);
+                    this._freeDownloadPort(port);
+                    reject(error);
+                }
+            });
+        });
+    }
 
-	/**
-	 * Once the download port is no longer in use, remove it from the list
-	 * so that it can be re-used later
-	 *
-	 * @param port
-	 */
-	private _freeDownloadPort(port: number) {
-		this.downloadPortsInUse = this.downloadPortsInUse.filter(_port => _port !== port);
-	}
+    /**
+     * Once the download port is no longer in use, remove it from the list
+     * so that it can be re-used later
+     *
+     * @param port
+     */
+    private _freeDownloadPort(port: number) {
+        this.downloadPortsInUse = this.downloadPortsInUse.filter(
+            _port => _port !== port
+        );
+    }
 
-	/**
-	 * After network is joined, want to make sure that there is peer available on the network and
-	 * able to connect. Otherwise, will re-join the network and re-connect with peer again
-	 * for MAX_ATTEMPT of tries.
-	 *
-	 * @param dat
-	 * @param network
-	 * @param port
-	 * @param attempt
-	 */
-	private _ensurePeerConnectedRetry(
-		dat: DatArchive,
-		network,
-		port: number,
-		attempt: number = 1
-	): Promise<any> {
-		return new Promise(async (resolve, reject) => {
-			ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT)
-				.then(() => {
-					debug(`[${dat.key.toString('hex')}] peer connection(s) has been made`);
-					resolve(port);
-				})
-				.catch( async (error) => {
-					debug(`[${dat.key.toString('hex')}] unable to connect to peer`);
-					if (attempt === this.MAX_ATTEMPT) {
-						network.close();
-						this._freeDownloadPort(port);
-						return reject(error);
-					}
-					await sleep(1000);
-					const {network: _network, port: _port} = await this._joinNetwork(dat, true, false, port+1);
-					network.close();
-					this._freeDownloadPort(port);
-					attempt++;
-					debug(`[${dat.key.toString('hex')}] network joined, ensuring peer connection... attempt #${attempt}`);
-					this._ensurePeerConnectedRetry(dat, _network, _port, attempt)
-						.then(resolve)
-						.catch(reject);
-				});
-		});
-	}
+    /**
+     * After network is joined, want to make sure that there is peer available on the network and
+     * able to connect. Otherwise, will re-join the network and re-connect with peer again
+     * for MAX_ATTEMPT of tries.
+     *
+     * @param dat
+     * @param network
+     * @param port
+     * @param attempt
+     */
+    private _ensurePeerConnectedRetry(
+        dat: DatArchive,
+        network,
+        port: number,
+        attempt: number = 1
+    ): Promise<any> {
+        return new Promise(async (resolve, reject) => {
+            ensurePeerConnected(network, this.DOWNLOAD_PROGRESS_TIMEOUT)
+                .then(() => {
+                    debug(
+                        `[${dat.key.toString(
+                            "hex"
+                        )}] peer connection(s) has been made`
+                    );
+                    resolve(port);
+                })
+                .catch(async error => {
+                    debug(
+                        `[${dat.key.toString("hex")}] unable to connect to peer`
+                    );
+                    if (attempt === this.MAX_ATTEMPT) {
+                        network.close();
+                        this._freeDownloadPort(port);
+                        return reject(error);
+                    }
+                    await sleep(1000);
+                    const {
+                        network: _network,
+                        port: _port
+                    } = await this._joinNetwork(dat, true, false, port + 1);
+                    network.close();
+                    this._freeDownloadPort(port);
+                    attempt++;
+                    debug(
+                        `[${dat.key.toString(
+                            "hex"
+                        )}] network joined, ensuring peer connection... attempt #${attempt}`
+                    );
+                    this._ensurePeerConnectedRetry(
+                        dat,
+                        _network,
+                        _port,
+                        attempt
+                    )
+                        .then(resolve)
+                        .catch(reject);
+                });
+        });
+    }
 }
 
 function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
