@@ -46,7 +46,7 @@ export type DatStats = {
     writer: boolean;
     version: number;
     files: number;
-    blocksDownlaoded: number;
+    blocksDownloaded: number;
     blocksLength: number;
     byteLength: number;
     progress: number;

@@ -636,6 +636,7 @@ export default class DatManager implements DatManagerInterface {
 
 function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
     return new Promise((resolve, reject) => {
+		const DAT_READY_TIMEOUT = 500;
         const datOptions = options || {};
         if (typeof storagePath === "string") {
             fs.ensureDirSync(storagePath);
@@ -647,8 +648,7 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             dat.getPath = () => storagePath;
             dat.getStats = (): DatStats => {
                 const stats = dat.stats.get();
-                let downloadPercent = stats.downloaded / stats.length;
-                if (dat.archive.writable) downloadPercent = 1.0;
+				const downloadPercent = calculateProgress(stats.downloaded, stats.length, dat.archive.writable);
                 // slight hack, but if this is an in-memory dat we override the complete
                 // state (specifically for the download process, since we initialize a disk version
                 // after in-memory dl is complete)
@@ -657,7 +657,7 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
                     writer: dat.archive.writable,
                     version: dat.archive.version || stats.version,
                     files: stats.files,
-                    blocksDownlaoded: dat.archive.writable
+                    blocksDownloaded: dat.archive.writable
                         ? stats.length
                         : stats.downloaded,
                     blocksLength: stats.length,
@@ -679,14 +679,20 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             };
             dat.getProgress = () => {
                 const stats = dat.stats.get();
-                let downloadPercent = stats.downloaded / stats.length;
-                if (dat.archive.writable) downloadPercent = 1.0;
-                if (!Number.isFinite(downloadPercent)) downloadPercent = 0;
-                return downloadPercent;
+				return calculateProgress(stats.downloaded, stats.length, dat.archive.writable);
             };
             dat.archive.ready(error => {
                 if (error) reject(error);
-                else resolve(dat);
+				else {
+					/**
+					 * Slight hack, if we resolve on dat.archive.ready,
+					 * dat.get.stats() will always return 0 value for every key.
+					 * Setting a timeout seems to fix it
+					 */
+					setTimeout(() => {
+						resolve(dat);
+					}, DAT_READY_TIMEOUT);
+				}
             });
         });
     });
@@ -725,4 +731,10 @@ async function sleep(ms: number): Promise<any> {
     return new Promise(resolve => {
         setTimeout(resolve, ms);
     });
+}
+
+function calculateProgress(downloaded: number, length: number, writable: boolean): number {
+	let downloadPercent = length ? (downloaded / length) : 0;
+	if (writable) downloadPercent = 1.0;
+	return downloadPercent;
 }
