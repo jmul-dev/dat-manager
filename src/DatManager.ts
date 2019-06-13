@@ -21,7 +21,7 @@ interface DatDbEntry {
 }
 
 export default class DatManager implements DatManagerInterface {
-    public DOWNLOAD_PROGRESS_TIMEOUT = 20000;
+    public DOWNLOAD_PROGRESS_TIMEOUT = 60000;
     public UPLOAD_PORT_START = 10000;
     public UPLOAD_PORT_END = 40000;
     public DOWNLOAD_PORT_START = 40001;
