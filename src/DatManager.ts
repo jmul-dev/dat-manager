@@ -636,7 +636,7 @@ export default class DatManager implements DatManagerInterface {
 
 function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
     return new Promise((resolve, reject) => {
-		const DAT_READY_TIMEOUT = 500;
+		const DAT_READY_TIMEOUT = 10;
         const datOptions = options || {};
         if (typeof storagePath === "string") {
             fs.ensureDirSync(storagePath);
