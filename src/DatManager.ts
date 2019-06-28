@@ -18,6 +18,7 @@ interface DatDbEntry {
     key: string;
     path: string;
     writable?: boolean;
+    flaggedForRemoval?: boolean;
 }
 
 export default class DatManager implements DatManagerInterface {
@@ -86,23 +87,27 @@ export default class DatManager implements DatManagerInterface {
             }
         );
         for (const entry of entries) {
-            const { key } = entry;
+            const { key, flaggedForRemoval } = entry;
             let dat: DatArchive;
-            try {
-                if (this._dats[key])
-                    throw new Error(
-                        `Dat instance already exists, cannot resume`
-                    );
-                dat = await createDat(entry.path, {
-                    key,
-                    ...this.datStorageOptions
-                });
-                await this._joinNetwork(dat, false, true);
-                this._dats[key] = dat;
-                debug(`[${key}] resumed dat`);
-            } catch (error) {
-                if (dat) await closeDat(dat);
-                debug(`[${key}] failed to resume dat: ${error.message}`);
+            if (flaggedForRemoval) {
+                await this.remove(key);
+            } else {
+                try {
+                    if (this._dats[key])
+                        throw new Error(
+                            `Dat instance already exists, cannot resume`
+                        );
+                    dat = await createDat(entry.path, {
+                        key,
+                        ...this.datStorageOptions
+                    });
+                    await this._joinNetwork(dat, false, true);
+                    this._dats[key] = dat;
+                    debug(`[${key}] resumed dat`);
+                } catch (error) {
+                    if (dat) await closeDat(dat);
+                    debug(`[${key}] failed to resume dat: ${error.message}`);
+                }
             }
         }
     }
@@ -430,7 +435,19 @@ export default class DatManager implements DatManagerInterface {
             await sleep(
                 500
             ); /* For some reason dat close may hang on to fd longer than it should */
-            await fs.remove(datDir);
+            try {
+                await fs.remove(datDir);
+            } catch (error) {
+                // Failed to remove directory!! For now we just flag it for removal on the next restart? Really just a patch for now
+                debug(
+                    `[${key}] failed to remove from disk, flagging for removal at a later time`
+                );
+                this._dbUpsert({
+                    key: key,
+                    path: datDir,
+                    flaggedForRemoval: true
+                });
+            }
         }
         dat = null;
         debug(`[${key}] succesfully removed!`);
@@ -636,7 +653,7 @@ export default class DatManager implements DatManagerInterface {
 
 function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
     return new Promise((resolve, reject) => {
-		const DAT_READY_TIMEOUT = 10;
+        const DAT_READY_TIMEOUT = 10;
         const datOptions = options || {};
         if (typeof storagePath === "string") {
             fs.ensureDirSync(storagePath);
@@ -648,7 +665,11 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             dat.getPath = () => storagePath;
             dat.getStats = (): DatStats => {
                 const stats = dat.stats.get();
-				const downloadPercent = calculateProgress(stats.downloaded, stats.length, dat.archive.writable);
+                const downloadPercent = calculateProgress(
+                    stats.downloaded,
+                    stats.length,
+                    dat.archive.writable
+                );
                 // slight hack, but if this is an in-memory dat we override the complete
                 // state (specifically for the download process, since we initialize a disk version
                 // after in-memory dl is complete)
@@ -679,20 +700,24 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             };
             dat.getProgress = () => {
                 const stats = dat.stats.get();
-				return calculateProgress(stats.downloaded, stats.length, dat.archive.writable);
+                return calculateProgress(
+                    stats.downloaded,
+                    stats.length,
+                    dat.archive.writable
+                );
             };
             dat.archive.ready(error => {
                 if (error) reject(error);
-				else {
-					/**
-					 * Slight hack, if we resolve on dat.archive.ready,
-					 * dat.get.stats() will always return 0 value for every key.
-					 * Setting a timeout seems to fix it
-					 */
-					setTimeout(() => {
-						resolve(dat);
-					}, DAT_READY_TIMEOUT);
-				}
+                else {
+                    /**
+                     * Slight hack, if we resolve on dat.archive.ready,
+                     * dat.get.stats() will always return 0 value for every key.
+                     * Setting a timeout seems to fix it
+                     */
+                    setTimeout(() => {
+                        resolve(dat);
+                    }, DAT_READY_TIMEOUT);
+                }
             });
         });
     });
@@ -733,8 +758,12 @@ async function sleep(ms: number): Promise<any> {
     });
 }
 
-function calculateProgress(downloaded: number, length: number, writable: boolean): number {
-	let downloadPercent = length ? (downloaded / length) : 0;
-	if (writable) downloadPercent = 1.0;
-	return downloadPercent;
+function calculateProgress(
+    downloaded: number,
+    length: number,
+    writable: boolean
+): number {
+    let downloadPercent = length ? downloaded / length : 0;
+    if (writable) downloadPercent = 1.0;
+    return downloadPercent;
 }
