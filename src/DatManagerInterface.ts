@@ -18,7 +18,7 @@ export type DatStorageOptions = {
 };
 
 export type DatDownloadOptions = {
-    resolveOnStart?: boolean;
+    onDownloadStart?: Function;
 };
 
 export default interface DatManagerInterface {

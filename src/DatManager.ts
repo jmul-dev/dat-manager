@@ -239,29 +239,17 @@ export default class DatManager implements DatManagerInterface {
                 );
                 progress.on("error", reject);
             });
-            // 6. Download may resolve once the download is complete, or once the download has
-            // started. This difference is waiting on downloadPromise.
-            if (!opts.resolveOnStart) {
-                await downloadPromise;
-                debug(
-                    `[${key}] resolving completed download, handoff to post process`
-                );
-                return await this._postDownloadProcessing(key, downloadPort);
-            } else {
-                debug(`[${key}] resolving download on start`);
-                downloadPromise
-                    .then(() => {
-                        return this._postDownloadProcessing(key, downloadPort);
-                    })
-                    .catch(error => {
-                        debug(
-                            `[${key}] error in download promise after resolving on download start: ${
-                                error.message
-                            }`
-                        );
-                    });
-                return dat;
+            // 6. Download has officially started
+            if (typeof opts.onDownloadStart === "function") {
+                debug(`[${key}] triggering onDownloadStart`);
+                opts.onDownloadStart();
             }
+            await downloadPromise;
+            const archive = await this._postDownloadProcessing(
+                key,
+                downloadPort
+            );
+            return archive;
         } catch (error) {
             try {
                 this._freeDownloadPort(downloadPort);
