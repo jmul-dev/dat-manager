@@ -14,13 +14,7 @@ export default interface DatArchive {
     joinNetwork(opts: Object, cb?: Function);
     leaveNetwork();
     stats: {
-        get(): {
-            files: number;
-            byteLength: number;
-            length: number;
-            version: number;
-            downloaded: number;
-        };
+        get(): DatFileStats;
         network: {
             downloadSpeed: number;
             uploadSpeed: number;
@@ -37,9 +31,17 @@ export default interface DatArchive {
         connecting: boolean;
         close(cb?: Function);
     } & EventEmitter;
-    getStats(): DatStats;
+    getStats(): Promise<DatStats>;
     getPath(): string;
 }
+
+export type DatFileStats = {
+    files: number;
+    byteLength: number;
+    length: number;
+    version: number;
+    downloaded: number;
+};
 
 export type DatStats = {
     key: string;

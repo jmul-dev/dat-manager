@@ -6,7 +6,7 @@ import fs from "fs-extra";
 import path, { resolve, join } from "path";
 import Dat from "dat-node";
 import Debug from "debug";
-import DatArchive, { DatStats } from "./DatArchive";
+import DatArchive, { DatStats, DatFileStats } from "./DatArchive";
 import Datastore from "nedb";
 import signatures from "sodium-signatures";
 import datEncoding from "dat-encoding";
@@ -651,40 +651,89 @@ function createDat(storagePath: string, options?: Object): Promise<DatArchive> {
             if (!dat) return reject(new Error(`No dat instance returned`));
             dat.trackStats();
             dat.getPath = () => storagePath;
-            dat.getStats = (): DatStats => {
-                const stats = dat.stats.get();
-                const downloadPercent = calculateProgress(
-                    stats.downloaded,
-                    stats.length,
-                    dat.archive.writable
-                );
-                // slight hack, but if this is an in-memory dat we override the complete
-                // state (specifically for the download process, since we initialize a disk version
-                // after in-memory dl is complete)
-                return {
-                    key: dat.key.toString("hex"),
-                    writer: dat.archive.writable,
-                    version: dat.archive.version || stats.version,
-                    files: stats.files,
-                    blocksDownloaded: dat.archive.writable
-                        ? stats.length
-                        : stats.downloaded,
-                    blocksLength: stats.length,
-                    byteLength: stats.byteLength,
-                    progress: downloadPercent,
-                    complete: downloadPercent === 1 && storagePath !== ram,
-                    network: {
-                        connected: dat.connected,
-                        downloadSpeed: dat.stats.network.downloadSpeed,
-                        uploadSpeed: dat.stats.network.uploadSpeed,
-                        downloadTotal: dat.stats.network.downloadTotal,
-                        uploadTotal: dat.stats.network.uploadTotal
-                    },
-                    peers: {
-                        total: dat.stats.peers.total,
-                        complete: dat.stats.peers.complete
-                    }
-                };
+            let lastKnownStats: DatStats = {
+                key: dat.key.toString("hex"),
+                writer: dat.archive.writable,
+                version: dat.archive.version,
+                files: 0,
+                blocksDownloaded: 0,
+                blocksLength: 0,
+                byteLength: 0,
+                progress: dat.archive.writable ? 1 : 0,
+                complete: dat.archive.writable && storagePath !== ram,
+                network: {
+                    connected: dat.connected,
+                    downloadSpeed: dat.stats.network.downloadSpeed,
+                    uploadSpeed: dat.stats.network.uploadSpeed,
+                    downloadTotal: dat.stats.network.downloadTotal,
+                    uploadTotal: dat.stats.network.uploadTotal
+                },
+                peers: {
+                    total: dat.stats.peers.total,
+                    complete: dat.stats.peers.complete
+                }
+            };
+            dat.getStats = (): Promise<DatStats> => {
+                return new Promise(resolve => {
+                    let tid = setTimeout(() => {
+                        debug(
+                            `[${dat.key.toString(
+                                "hex"
+                            )}] dat.stats.get failed to return in a timeley fashion! reverting to last known stats...`
+                        );
+                        resolve(lastKnownStats);
+                    }, 1000);
+                    let stats = dat.stats.get();
+                    clearTimeout(tid);
+                    const downloadPercent = calculateProgress(
+                        stats.downloaded,
+                        stats.length,
+                        dat.archive.writable
+                    );
+                    // slight hack, but if this is an in-memory dat we override the complete
+                    // state (specifically for the download process, since we initialize a disk version
+                    // after in-memory dl is complete)
+                    lastKnownStats = {
+                        key: dat.key.toString("hex"),
+                        writer: dat.archive.writable,
+                        version: dat.archive.version || stats.version,
+                        files: stats.files,
+                        blocksDownloaded: dat.archive.writable
+                            ? stats.length
+                            : stats.downloaded,
+                        blocksLength: stats.length,
+                        byteLength: stats.byteLength,
+                        progress: downloadPercent,
+                        complete: downloadPercent === 1 && storagePath !== ram,
+                        network: dat.stats.network
+                            ? {
+                                  connected: dat.connected,
+                                  downloadSpeed:
+                                      dat.stats.network.downloadSpeed,
+                                  uploadSpeed: dat.stats.network.uploadSpeed,
+                                  downloadTotal:
+                                      dat.stats.network.downloadTotal,
+                                  uploadTotal: dat.stats.network.uploadTotal
+                              }
+                            : {
+                                  connected: dat.connected,
+                                  downloadSpeed: 0,
+                                  uploadSpeed: 0,
+                                  downloadTotal: 0,
+                                  uploadTotal: 0
+                              },
+                        peers: dat.stats.peers
+                            ? {
+                                  total: dat.stats.peers.total,
+                                  complete: dat.stats.peers.complete
+                              }
+                            : {
+                                  total: 0,
+                                  complete: 0
+                              }
+                    };
+                    resolve(lastKnownStats);
+                });
             };
             dat.getProgress = () => {
                 const stats = dat.stats.get();
