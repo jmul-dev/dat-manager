@@ -140,7 +140,7 @@ export default class DatManager implements DatManagerInterface {
         let downloadPort;
         if (dat && dat.getProgress() < 1) {
             throw new Error(
-                `Dat instance already exists, download in progress`
+                `Dat instance already exists, download in progress: ${dat.getProgress()}`
             );
         } else if (dat) {
             // Already have completely downloaded dat, just return that
@@ -242,7 +242,7 @@ export default class DatManager implements DatManagerInterface {
             // 6. Download has officially started
             if (typeof opts.onDownloadStart === "function") {
                 debug(`[${key}] triggering onDownloadStart`);
-                opts.onDownloadStart();
+                opts.onDownloadStart({ isComplete: dat.getProgress() });
             }
             await downloadPromise;
             const archive = await this._postDownloadProcessing(
