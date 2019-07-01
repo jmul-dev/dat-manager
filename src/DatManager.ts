@@ -19,6 +19,7 @@ interface DatDbEntry {
     path: string;
     writable?: boolean;
     flaggedForRemoval?: boolean;
+    complete: boolean;
 }
 
 export default class DatManager implements DatManagerInterface {
@@ -136,18 +137,33 @@ export default class DatManager implements DatManagerInterface {
         opts: DatDownloadOptions = {}
     ): Promise<DatArchive> {
         debug(`[${key}] attempting to download...`);
+        const downloadPath = path.join(this.datStoragePath, key);
         let dat: DatArchive = this._dats[key];
         let downloadPort;
         if (dat && dat.getProgress() < 1) {
-            throw new Error(
-                `Dat instance already exists, download in progress: ${dat.getProgress()}`
-            );
+            if (dat.getProgress() === 0) {
+                // Might have got stuck on a failed download, lets remove and continue
+                debug(
+                    `[${key}] assuming previously failed or stuck download, removing and continuing with download...`
+                );
+                await this.remove(key);
+            } else {
+                // TODO: would be ideal to listen for the download completion and return here.
+                throw new Error(
+                    `Dat instance already exists, download in progress: ${dat.getProgress()}`
+                );
+            }
         } else if (dat) {
             // Already have completely downloaded dat, just return that
             return dat;
         }
         try {
-            const downloadPath = path.join(this.datStoragePath, key);
+            // 0. insert dat into db
+            await this._dbUpsert({
+                key,
+                path: downloadPath,
+                complete: false
+            });
             // 1. Create the dat in ram, which will then be mirrored to downloadPath
             dat = await createDat(ram, {
                 key,
@@ -266,6 +282,12 @@ export default class DatManager implements DatManagerInterface {
                         error.message
                     }`
                 );
+                await this._dbUpsert({
+                    key,
+                    path: downloadPath,
+                    flaggedForRemoval: true,
+                    complete: false
+                });
                 throw error;
             }
             throw error;
@@ -295,7 +317,8 @@ export default class DatManager implements DatManagerInterface {
             // 5. Add dat to storage
             await this._dbUpsert({
                 key: key,
-                path: downloadPath
+                path: downloadPath,
+                complete: true
             });
             this._dats[key] = diskDat;
             // Close in memory dat
@@ -313,7 +336,7 @@ export default class DatManager implements DatManagerInterface {
         } catch (error) {
             try {
                 debug(
-                    `[${key}] caught error during download process (${
+                    `[${key}] caught error during post download processing (${
                         error.message
                     }), attempt to clean up...`
                 );
@@ -355,7 +378,12 @@ export default class DatManager implements DatManagerInterface {
         debug(`[${key}] files imported`);
         await this._joinNetwork(dat, false, true);
         debug(`[${key}] storing dat in persisted storage...`);
-        await this._dbUpsert({ key, path: newDatDir, writable: dat.writable });
+        await this._dbUpsert({
+            key,
+            path: newDatDir,
+            writable: dat.writable,
+            complete: true
+        });
         debug(`[${key}] dat created and stored!`);
         return dat;
     }
@@ -433,6 +461,7 @@ export default class DatManager implements DatManagerInterface {
                 this._dbUpsert({
                     key: key,
                     path: datDir,
+                    complete: false,
                     flaggedForRemoval: true
                 });
             }
